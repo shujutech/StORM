@@ -1,6 +1,6 @@
 # StORM
 
-StORM (Shujutech Object Relational Mapper) maps Java POJO into relational databases (currently supported databases are mariadb, mysql, oracle and postgres). StORM is the only true ORM that is able to map all OOP concept into a retional database.
+StORM (Shujutech Object Relational Mapper) maps Java POJO into relational databases (currently supported databases are mariadb, mysql, oracle and postgres). StORM is the only true ORM that is able to map all OOP concept into a relational database.
 
 # Features
 
