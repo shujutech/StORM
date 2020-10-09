@@ -3,9 +3,9 @@
 StORMi maps Java POJO into relational databases. StORMi is the only true ORM that is able to map all OO concept into a relational database.
 
 
-# Supported Databae
+# Supported Database
 
-- MySQL- 
+- MySQL
 - MariaDB
 - Postgres
 - Oracle
@@ -29,6 +29,14 @@ StORMi supports the following database operations:
 - Persistence (when a Java POJO class is persisted, StORMi will handle all the underlying intricancies)
 - Deletion (when deleting a class, StORMi can also delete its related class when configured to do so)
 - Updating (like Persistence and Deletion, many complex class relationship is being manage by StORMi)
+
+# Quick Start
+
+
+
+# Contact Us
+
+For any further support, please contact me at shujutech@gmail.com
 
 
 
