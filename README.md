@@ -30,6 +30,14 @@ StORMi supports the following database operations:
 - Deletion (when deleting a class, StORMi can also delete its related class when configured to do so)
 - Updating (like Persistence and Deletion, many complex class relationship is being manage by StORMi)
 
+# Benefits
+
+- Allow full enterprise team to use standard OOP as the universal design model
+- Never redesign your data model again with StORMi standard, consistent and reusable model
+- Allows team to have common understanding of a single design principal and concept
+- No duplication of enterprise information
+- Unlimited standardise scaling capabilities for all your enterprise information system
+
 # Quick Start
 
 
