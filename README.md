@@ -3,7 +3,7 @@
 StORMi maps Java POJO into relational databases. StORMi is the only true ORM that is able to map all OO concept into a relational database.
 
 
-# Supported Database
+## Supported Database
 
 - MySQL
 - MariaDB
@@ -11,7 +11,7 @@ StORMi maps Java POJO into relational databases. StORMi is the only true ORM tha
 - Oracle
 
 
-# Features
+## Features
 
 StORMi supports mapping the following Java OOP concepts:
 
@@ -30,7 +30,7 @@ StORMi supports the following database operations:
 - Deletion (when deleting a class, StORMi can also delete its related class when configured to do so)
 - Updating (like Persistence and Deletion, many complex class relationship is being manage by StORMi)
 
-# Benefits
+## Benefits
 
 - Allow full enterprise team to use standard OOP as the universal design model
 - Never redesign your data model again with StORMi standard, consistent and reusable model
@@ -38,11 +38,58 @@ StORMi supports the following database operations:
 - No duplication of enterprise information
 - Unlimited standardise scaling capabilities for all your enterprise information system
 
-# Quick Start
+## Examples
+
+#### Defining database objects from Java classes 
+
+````java
+public class Addr extends Clasz {
+	@ReflectField(type=FieldType.STRING, size=32, displayPosition=5) 
+	public static String Addr1;
+  
+	@ReflectField(type=FieldType.STRING, size=32, displayPosition=10) 
+	public static String Addr2;
+  
+	@ReflectField(type=FieldType.STRING, size=32, displayPosition=15) 
+	public static String Addr3;
+  
+	@ReflectField(type=FieldType.STRING, size=8, displayPosition=20) 
+	public static String PostalCode;
+  
+	@ReflectField(type=FieldType.OBJECT, deleteAsMember=false, 
+	clasz=biz.shujutech.bznes.Country, displayPosition=35, prefetch=true, lookup=true) 
+	public static String Country; 
+  
+	@ReflectField(type=FieldType.OBJECT, deleteAsMember=false, 
+	clasz=biz.shujutech.bznes.State, displayPosition=40, prefetch=true, lookup=true) 
+	public static String State; 
+  
+	@ReflectField(type=FieldType.OBJECT, deleteAsMember=false, 
+	clasz=biz.shujutech.bznes.City, displayPosition=45, prefetch=true, lookup=true) 
+	public static String City; 
+}
+````
+
+#### Persisting objects (insert and update)
+
+````java
+	Person employee = (Person) ObjectBase.CreateObject(conn, Person.class);
+	employee.setName("Ken Miria");
+	employee.setBirthDate(new DateTime());
+	employee.setGender(Gender.Male);
+	employee.setNationality(Country.UnitedStates);
+	employee.setMaritalStatus(Marital.Married);
+	company.addEmployee(conn, employee);
+
+	ObjectBase.PersistCommit(conn, company);
+````
+
+
+## Quick Start
 
 
 
-# Contact Us
+## Contact Us
 
 For any further support, please contact me at shujutech@gmail.com
 
