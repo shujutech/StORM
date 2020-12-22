@@ -29,6 +29,7 @@ StORMi supports the following database operations:
 - Persistence (when a Java POJO class is persisted, StORMi will handle all the underlying intricancies)
 - Deletion (when deleting a class, StORMi can also delete its related class when configured to do so)
 - Updating (like Persistence and Deletion, many complex class relationship is being manage by StORMi)
+- No SQL hence can be easily ported to any SQL database, DDL/DML can be done through java methods
 
 ## Benefits
 
@@ -70,7 +71,7 @@ public class Addr extends Clasz {
 }
 ````
 
-#### Persisting objects (insert and update)
+#### Persisting objects (insert or update)
 
 ````java
 	Person employee = (Person) ObjectBase.CreateObject(conn, Person.class);
@@ -84,7 +85,22 @@ public class Addr extends Clasz {
 	ObjectBase.PersistCommit(conn, company);
 ````
 
+#### Deleting objects
 
+````java
+	Person person = (Person) objectDb.createObject(Person.class); // remove previous Person testing data if exist
+	person.setName("Edward Yourdon");
+	if (person.populate(conn) == true) {
+		if (person.deleteCommit(conn)) {
+			App.logInfo("Deleted person Edward Yourdon");
+		} else {
+			throw new Hinderance("Fail to delete person Edward Yourdon");
+		}
+	}
+````
+
+
+				
 ## Quick Start
 
 
