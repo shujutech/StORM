@@ -43,9 +43,10 @@ StORMi supports the following database operations:
 
 ## Examples
 
-#### Defining database objects from Java classes 
+#### Defining database object 
 
 ````java
+// anything that extends Clasz will be map into the database
 public class Addr extends Clasz {
 	@ReflectField(type=FieldType.STRING, size=32, displayPosition=5) 
 	public static String Addr1;
@@ -90,7 +91,8 @@ public class Addr extends Clasz {
 #### Deleting objects
 
 ````java
-	Person person = (Person) objectDb.createObject(Person.class); // remove previous Person testing data if exist
+	// create the object to delete and set a unique search criteria
+	Person person = (Person) objectDb.createObject(Person.class); 
 	person.setName("Edward Yourdon");
 	if (person.populate(conn) == true) {
 		if (person.deleteCommit(conn)) {
