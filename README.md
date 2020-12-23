@@ -1,6 +1,6 @@
 ## StORMi
 
-![](http://shujutech.mywire.org/img/dblogo5.png)
+<img src="http://shujutech.mywire.org/img/dblogo5.png" alt="alt text" width="50%" height="50%">
 
 StORMi maps Java POJO into relational databases. StORMi is the only true ORM that is able to map all OO concept into a relational database.
 
