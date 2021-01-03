@@ -102,12 +102,26 @@ public class Addr extends Clasz {
 		}
 	}
 ````
-
-
 				
 ## Quick Start
 
+To use StORMi without maven, simply copy the jar file from the relase directory into your java project library and compile the provided sample in the example directory.
 
+If you're using maven, dowload the release directory and run the following maven command:
+
+````bash
+	mvn install:install-file -Dfile=./StORMi-1.0-SNAPSHOT.jar -DpomFile=./pom.xml
+````
+
+After installing StORMi into your maven repository, use the following pom dependency in you maven project:
+
+````maven
+	<dependency>
+		<groupId>biz.shujutech</groupId>
+		<artifactId>StORMi</artifactId>
+		<version>1.0-SNAPSHOT</version>
+	</dependency>
+````
 
 ## Contact Us
 
