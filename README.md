@@ -61,15 +61,15 @@ public class Addr extends Clasz {
 	public static String PostalCode;
   
 	@ReflectField(type=FieldType.OBJECT, deleteAsMember=false, 
-	clasz=biz.shujutech.bznes.Country, displayPosition=35, prefetch=true, lookup=true) 
+	clasz=biz.shujutech.bznes.Country.class, displayPosition=35, prefetch=true, lookup=true) 
 	public static String Country; 
   
 	@ReflectField(type=FieldType.OBJECT, deleteAsMember=false, 
-	clasz=biz.shujutech.bznes.State, displayPosition=40, prefetch=true, lookup=true) 
+	clasz=biz.shujutech.bznes.State.class, displayPosition=40, prefetch=true, lookup=true) 
 	public static String State; 
   
 	@ReflectField(type=FieldType.OBJECT, deleteAsMember=false, 
-	clasz=biz.shujutech.bznes.City, displayPosition=45, prefetch=true, lookup=true) 
+	clasz=biz.shujutech.bznes.City.class, displayPosition=45, prefetch=true, lookup=true) 
 	public static String City; 
 }
 ````
