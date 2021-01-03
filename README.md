@@ -105,7 +105,7 @@ public class Addr extends Clasz {
 				
 ## Quick Start
 
-To use StORMi without maven, simply copy the jar file from the relase directory into your java project library and compile the provided sample in the example directory.
+To use StORMi without maven, copy the jar file in the 'relase' directory into your java project library. 
 
 If you're using maven, dowload the release directory and run the following maven command:
 
@@ -122,6 +122,10 @@ After installing StORMi into your maven repository, use the following pom depend
 		<version>1.0-SNAPSHOT</version>
 	</dependency>
 ````
+
+To try out StORMi, go to the 'example' directory and compile 'Simple.java' and execute it. To compile with IDE (e.g. eclipse or netbeans) you can import the maven project.
+
+Before executing the 'example', create a database (either postgresql or mysql) and configure it's jdbc properties in the file 'stormi.properties' (jdbcUser, jdbcPassword, jdbcUrl). The default configured is (schema: stormi, login: postgres, password: abc1234)
 
 ## Contact Us
 
