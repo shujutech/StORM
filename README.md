@@ -115,25 +115,25 @@ public class Addr extends Clasz {
 
 5. Go into the example directory and run 
 
-....bash
+````bash
 	mvn clean compile assembly:single
-....
+````
 
 6. In the example/target directory, copy stormi.proprties into the target directory
 
-....bash
+````bash
 	cp ../stormi.properties .
-....
+````
 
 7. Run the example application with
 
-....bash
+````bash
 	java -jar example-1.0-SNAPSHOT-jar-with-dependencies.jar
-....
+````
 
 8. You will get the follwoing output
 
-....bash
+````bash
 	18Jun2021 22:56:14 INFO Log level is at: DEBG
 	18Jun2021 22:56:14 INFO Working directory: C:\Shujutech\StORMi-main\example\target
 	18Jun2021 22:56:14 INFO Found property file at: C:\Shujutech\StORMi-main\example\target\stormi.properties
@@ -157,7 +157,7 @@ public class Addr extends Clasz {
 	18Jun2021 22:56:15 INFO [Clasz] Creating table for class: 'LeaveForm'
 	18Jun2021 22:56:15 INFO [Simple] Successfully save leave form into the database!
 	18Jun2021 22:56:15 DEBG [ConnectionPool] Released jdbc connection, total free connection: 2
-....
+````
 
 9. Check your database for the created tables
 
