@@ -105,6 +105,65 @@ public class Addr extends Clasz {
 				
 ## Quick Start
 
+1. Install Postgres create a database name 'stormi' using 'postgres' user and 'abc1234' password.
+
+2. Install java and maven
+
+3. Download Stormi soruce code from github.
+
+4. Run mvn install in Stormi directory
+
+5. Go into the example directory and run 
+
+....bash
+	mvn clean compile assembly:single
+....
+
+6. In the example/target directory, copy stormi.proprties into the target directory
+
+....bash
+	cp ../stormi.properties .
+....
+
+7. Run the example application with
+
+....bash
+	java -jar example-1.0-SNAPSHOT-jar-with-dependencies.jar
+....
+
+8. You will get the follwoing output
+
+....bash
+	18Jun2021 22:56:14 INFO Log level is at: DEBG
+	18Jun2021 22:56:14 INFO Working directory: C:\Shujutech\StORMi-main\example\target
+	18Jun2021 22:56:14 INFO Found property file at: C:\Shujutech\StORMi-main\example\target\stormi.properties
+	18Jun2021 22:56:14 INFO Configuration from: C:\Shujutech\StORMi-main\example\target\stormi.properties
+	18Jun2021 22:56:14 INFO Log file: C:\Users\Admin\AppData\Local\Temp\\App.202106.log
+	18Jun2021 22:56:14 INFO Log on console: true
+	18Jun2021 22:56:14 INFO Log next switch at: 2021-07-01T00:00:00.244+08:00
+	18Jun2021 22:56:14 INFO Maximum thread: 16
+	18Jun2021 22:56:14 COFG OS name: Windows 10
+	18Jun2021 22:56:14 COFG OS architecture: amd64
+	18Jun2021 22:56:14 COFG OS version: 10.0
+	18Jun2021 22:56:14 COFG Java classpath: example-1.0-SNAPSHOT-jar-with-dependencies.jar
+	18Jun2021 22:56:14 INFO Total db connection available for threading: 2
+	18Jun2021 22:56:14 COFG Jdbc, connecting with url = jdbc:postgresql://localhost:5432/stormi
+	18Jun2021 22:56:14 COFG Jdbc, connecting with user = postgres
+	18Jun2021 22:56:14 COFG Jdbc, connecting with password = *********
+	18Jun2021 22:56:14 COFG Jdbc, connecting with init conn = 2
+	18Jun2021 22:56:14 COFG Jdbc, connecting with max conn = 32
+	18Jun2021 22:56:14 COFG Jdbc, connecting with time out= 30
+	18Jun2021 22:56:15 WARN [ConnectionPool] Getting jdbc connection, available free connection to get from: 2
+	18Jun2021 22:56:15 INFO [Clasz] Creating table for class: 'LeaveForm'
+	18Jun2021 22:56:15 INFO [Simple] Successfully save leave form into the database!
+	18Jun2021 22:56:15 DEBG [ConnectionPool] Released jdbc connection, total free connection: 2
+....
+
+9. Check your database for the created tables
+
+
+## Usage
+
 To use StORMi without maven, copy the jar file in the 'relase' directory into your java project library. 
 
 If you're using maven, dowload the release directory and run the following maven command:
