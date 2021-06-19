@@ -105,13 +105,17 @@ public class Addr extends Clasz {
 				
 ## Quick Start
 
-1. Install Postgres create a database name 'stormi' using 'postgres' user and 'abc1234' password.
+1. Install Postgres and create a database name 'stormi' using 'postgres' user and 'abc1234' password.
 
-2. Install java and maven
+2. Install Java and Maven if you do not have them.
 
-3. Download Stormi soruce code from github.
+3. Download StORMi soruce code from github and extract them to your install directory.
 
-4. Run mvn install in Stormi directory
+4. Build StORMi by going into the installed directory and run
+
+````bash
+	mvn install
+````
 
 5. Go into the example directory and run 
 
