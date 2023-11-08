@@ -7,8 +7,8 @@ public class FieldLong extends Field {
 	private Long valueLong;
 
 	public FieldLong(String aName) {
-		this.setFieldName(aName);
-		this.setFieldType(FieldType.LONG);
+		this.setDbFieldName(aName);
+		this.setDbFieldType(FieldType.LONG);
 	}
 
 	public FieldLong(String aName, Long aValue) {
@@ -31,10 +31,12 @@ public class FieldLong extends Field {
 		this.setValueLong((Long) value);
 	}
 
+	/*
 	@Override
 	public Object getValueObj() {
 		return(valueLong);
 	}
+	*/
 
 	@Override
 	public Object getValueObj(Connection aConn) {

@@ -14,7 +14,7 @@ public @interface ReflectField {
 	public int size() default 0;
 	public String mask() default "";
 	//public String clasz() default "";
-	public Class clasz() default Clasz.class;
+	public Class<?> clasz() default Clasz.class;
 	public boolean inline() default false;	
 	public String[] value() default {};
 	public boolean deleteAsMember() default false;

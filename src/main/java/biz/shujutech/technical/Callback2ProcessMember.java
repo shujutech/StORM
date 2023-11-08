@@ -4,7 +4,7 @@ import biz.shujutech.base.Connection;
 import biz.shujutech.db.object.Clasz;
 
 @FunctionalInterface
-public interface Callback2ProcessClasz {
-	public boolean processClasz(Connection aConn, Clasz<?> aClasz) throws Exception;
+public interface Callback2ProcessMember<Ty extends Clasz<?>> {
+	public boolean processClasz(Connection aConn, Ty aClasz) throws Exception;
 }
 

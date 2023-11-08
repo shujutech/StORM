@@ -5,7 +5,7 @@ public class FieldBase64 extends FieldStr {
 
 	public FieldBase64(String aName) {
 		super(aName, MAX_BASE64_SIZE);
-		this.setFieldType(FieldType.BASE64);
+		this.setDbFieldType(FieldType.BASE64);
 	}
 	
 }

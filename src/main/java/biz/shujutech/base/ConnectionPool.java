@@ -71,14 +71,15 @@ public final class ConnectionPool {
 		App.logConf("Jdbc, connecting with password = *********");
 		App.logConf("Jdbc, connecting with init conn = " + this.cpInitConn);
 		App.logConf("Jdbc, connecting with max conn = " + this.cpMaxConn);
-		App.logConf("Jdbc, connecting with time out= " + this.cpTimeOut);
+		App.logConf("Jdbc, connecting with time out = " + this.cpTimeOut);
 
 		// load and register all drivers from aDriver
 		StringTokenizer St = new StringTokenizer(aDriver);
 		while (St.hasMoreElements()) {
 			String driverName = St.nextToken().trim();
 			try {
-				Driver loadDriver = (Driver) Class.forName(driverName).newInstance();
+				//Driver loadDriver = (Driver) Class.forName(driverName).newInstance();
+				Driver loadDriver = (Driver) (Class.forName(driverName)).getConstructor().newInstance();
 				DriverManager.registerDriver(loadDriver);
 				cpDriver.add(loadDriver);
 			} catch (Throwable ex) {
@@ -239,7 +240,7 @@ public final class ConnectionPool {
 	private synchronized Connection getPooledConnection() throws Exception {
 		Connection resultConn = null;
 		if (this.cpFreeConn.size() > 0) {
-			resultConn = (Connection) this.cpFreeConn.get(0); // pick the first Connection in the array to get round-robin usage
+			resultConn = this.cpFreeConn.get(0); // pick the first Connection in the array to get round-robin usage
 			this.cpCheckOut++;
 			this.cpFreeConn.remove(0);
 		} else if (this.cpMaxConn == 0 || this.cpCheckOut < this.cpMaxConn) {
@@ -305,7 +306,7 @@ public final class ConnectionPool {
 				closeConn.close();
 				cntr++;
 			} catch (SQLException ex) {
-				resultMsg.concat(Hinderance.exStackToStr(ex, "Fail to close database connection: " + cntr));
+				resultMsg.concat(Hinderance.ExStackToStr(ex, "Fail to close database connection: " + cntr));
 			}
 		}
 		App.logInfo(this, "Closed all connection and removed from connection pool");
@@ -317,7 +318,7 @@ public final class ConnectionPool {
 			try {
 				DriverManager.deregisterDriver(driver);
 			} catch (SQLException ex) {
-				resultMsg.concat(Hinderance.exStackToStr(ex, "Fail to deregister Jdbc driver: " + driver.getClass().getName()));
+				resultMsg.concat(Hinderance.ExStackToStr(ex, "Fail to deregister Jdbc driver: " + driver.getClass().getName()));
 			}
 		}
 

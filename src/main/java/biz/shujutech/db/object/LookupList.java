@@ -1,9 +1,10 @@
 package biz.shujutech.db.object;
 
+import biz.shujutech.base.Base;
 import biz.shujutech.base.Connection;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class LookupList extends Clasz implements Lookup {
+public class LookupList extends Clasz<Base> implements Lookup {
 	private String descr;
 	private final CopyOnWriteArrayList<Lookup> LookupList = new CopyOnWriteArrayList<>();
 

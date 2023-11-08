@@ -2,17 +2,25 @@ package biz.shujutech.util;
 
 
 import static biz.shujutech.base.App.ERROR_COMPLAIN;
+
+import biz.shujutech.base.App;
 import biz.shujutech.base.Hinderance;
 import biz.shujutech.db.object.Clasz;
 import java.io.File;
 import java.net.URI;
+import java.text.DecimalFormat;
 import java.util.Random;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 
 
 public class Generic {
+	public static final int MAX_DIGIT_FOR_SORT = 16;
+	public static final int MAX_FLOAT_FOR_SORT = 20;
+	public static final DecimalFormat FloatFormatForSort = new DecimalFormat("0.000");
+
 	 /**
 	 * <p>Checks if the String contains only unicode digits.
 	 * A decimal point is not a unicode digit and returns false.</p>
@@ -182,7 +190,7 @@ public class Generic {
 		return cs == null || cs.isEmpty();
 	}
 
-	public static boolean IsEmptyOrNull(Clasz cs) {
+	public static boolean IsEmptyOrNull(Clasz<?> cs) {
 		return cs == null;
 	}
 
@@ -326,14 +334,63 @@ public class Generic {
 		return(leafName);
 	}
 
-	public static File FindFileAtUserDir(final String fileName) {
+	public static File FindFileAtRunFromDir(final String fileName) {
 		String userDir = System.getProperty("user.dir");
 		String fileNameWithPath = userDir + File.separator + fileName;
 		File result = new File(fileNameWithPath);
 		if (result.exists()) {
 			return(result);
 		} else {
+			App.logInfo("There is not such file in 'run from' directory: " + fileNameWithPath);
 			return(null);
+		}
+	}
+
+	public static String GetStartupJarLocation() {
+		String fatJarFileNameAndPath = System.getProperty("java.class.path");
+		File fatJarFile = new File(fatJarFileNameAndPath).getAbsoluteFile();
+		File fatJarParentFile = fatJarFile.getParentFile();
+		if (fatJarParentFile == null) fatJarParentFile = new File(File.separator);
+		return fatJarParentFile.getAbsolutePath();
+	}
+
+	public static File FindFileAtStartupJarDir(final String fileName) {
+		//String fatJarFileNameAndPath = App.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+		/*
+		String fatJarFileNameAndPath = System.getProperty("java.class.path");
+		File fatJarFile = new File(fatJarFileNameAndPath).getAbsoluteFile();
+		File fatJarParentFile = fatJarFile.getParentFile();
+		*/
+		String fatJarParentFileName = GetStartupJarLocation();
+		File fatJarParentFile = new File(fatJarParentFileName);
+
+		String fileNameWithPath = fatJarParentFile.getAbsolutePath() + File.separator + fileName;
+		File result = new File(fileNameWithPath);
+		if (result.exists()) {
+			return result;
+		} else {
+			App.logInfo("There is no such file in startup jar directory: " + fileNameWithPath);
+			return null;
+
+			/*
+			App.logInfo("Property file: " + fileName + ", is not in jar directory: " + fatJarParentFile.getAbsolutePath());
+			String classPath = System.getProperty("java.class.path");
+			File classPathFile = new File(classPath);
+			File classPathFileParent = classPathFile.getParentFile();
+			if (classPathFileParent != null) {
+				fileNameWithPath = classPathFileParent.getAbsolutePath() + File.separator + fileName;
+				result = new File(fileNameWithPath);
+				if (result.exists()) {
+					return(result);
+				} else {
+					App.logInfo("Property file: " + fileName + ", is not in jar class path: " + classPathFileParent.getAbsolutePath());
+					return(null);
+				}
+			} else {
+				App.logInfo("Property file: " + fileName + ", cannot find jar class path");
+				return(null);
+			}
+		*/
 		}
 	}
 
@@ -419,4 +476,46 @@ public class Generic {
 		return comparisonResult;
 	}	
 
+	public static boolean IsEqual(String aLeft, String aRight) {
+		boolean result = false;
+		if (aLeft == null) aLeft = "";
+		if (aRight == null) aRight = "";
+		if (aLeft.trim().toLowerCase().equals(aRight.trim().toLowerCase())) result = true;
+		return(result);
+	}
+
+	public static boolean IsNullOrFalse(Boolean aBoolean) {
+		boolean result = false;
+		if (aBoolean == null || aBoolean.equals(false)) {
+			result = true;
+		}
+		return(result);
+	}
+
+	public static boolean CsvContainStr(String aCsvStr, String aStr2Find)  {
+		boolean result = false;
+		String[] strList = aCsvStr.split(",");
+		for(String eachStr : strList) {
+			eachStr = eachStr.trim();
+			if (eachStr.toLowerCase().equals(aStr2Find.toLowerCase().trim())) {
+				result = true;
+				break;
+			}
+		}
+		return result;
+	}
+
+	public static String PadDigitForSort(String aStrDigit)  {
+		return StringUtils.leftPad(aStrDigit.trim(), MAX_DIGIT_FOR_SORT, " ");
+	}
+
+	public static String PadStrForSort(String aStrDigit, int aLen)  {
+		return StringUtils.rightPad(aStrDigit.trim(), aLen, " ");
+	}
+
+	public static String PadFloatForSort(String aStrDigit)  {
+		Float theFloat = Float.parseFloat(aStrDigit);
+		String strFloat = FloatFormatForSort.format(theFloat);
+		return StringUtils.leftPad(strFloat.trim(), MAX_FLOAT_FOR_SORT, " ");
+	}
 }

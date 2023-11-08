@@ -22,8 +22,7 @@ import java.lang.reflect.Modifier;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.joda.time.DateTime;
 
@@ -36,7 +35,7 @@ public class ObjectBase extends Database {
 	public static String ABSTRACT_OBJECT_ID = "leaf_object_id";
 	public static String ABSTRACT_CLASS = "leaf_clasz";
 	
-	/**
+	/*
 	 * Traverses the class of Clasz type inheritance hierarchy and create each
 	 * table for each of the traverse class. Uses reflection to determine the
 	 * hierarchy tree class. For every created object, this method will 
@@ -53,68 +52,51 @@ public class ObjectBase extends Database {
 	 * class. For abstract class, the fields in the abstract class is added to
 	 * the first normal child class in the inheritance tree.
 	 * 
-	 * @param aClass
-	 * @return
-	 * @throws Exception 
 	 */
-	@Deprecated
-	public Clasz createObject(Class aClass) throws Exception {
-		return(this.createObject(aClass, true));
+
+	public <Ty extends Clasz<?>> Ty createObject(Connection aConn, Class<Ty> aClass) throws Exception {
+		return ObjectBase.CreateObject(aConn, aClass);
+	}
+	
+	public Clasz<?> createClasz(Connection aConn, Class<?> aClass) throws Exception {
+		return ObjectBase.CreateObject(aConn, aClass.asSubclass(Clasz.class));
 	}
 
-	@Deprecated
-	public Clasz createObject(Class aClass, boolean aDoDDL) throws Exception {
-		Connection conn = this.connPool.getConnection();
-		try {
-			return(this.createObject(aClass, conn, aDoDDL));
-		} finally {
-			if (conn != null) {
-				this.connPool.freeConnection(conn);
-			}
-		}		
+	public static Clasz<?> CreateClaszFreeType(Connection aConn, Class<?> aClass) throws Exception {
+		return CreateObject(aConn, aClass.asSubclass(Clasz.class));
 	}
 
-	@Deprecated
-	public Clasz createObject(Class aClass, Connection conn) throws Exception {
-		Clasz result = this.createObject(aClass, conn, true);
-		return(result);
-	}
-
-	@Deprecated
-	private Clasz createObject(Class aClass, Connection conn, boolean aDoDDL) throws Exception {
-		Clasz result = Clasz.CreateObject(this, conn, aClass, aDoDDL);
-		//result.createBasicField(conn);
+	public static <Ty extends Clasz<?>> Ty CreateObject(Connection conn, Class<Ty> aClass) throws Exception {
+		Ty result = Clasz.CreateObject(conn, aClass);
 		result.initBeforePopulate();
 		result.initBeforePopulate(conn);
-		return(result);
+		return aClass.cast(result);
 	}
 
-	public static Clasz CreateObject(Connection conn, Class aClass) throws Exception {
-		Clasz result = Clasz.CreateObject((ObjectBase) conn.getBaseDb(), conn, aClass);
+	public static Clasz<?> CreateObjectFromAnyClass(Connection conn, Class<?> aClass) throws Exception {
+		Clasz<?> result = Clasz.CreateObjectFromAnyClass(conn, aClass);
 		result.initBeforePopulate();
 		result.initBeforePopulate(conn);
-		return(result);
+		return Clasz.class.cast(result);
 	}
 
-	/*
-	private static Clasz CreateObject(ObjectBase aDb, Connection conn, Class aClass) throws Exception {
-		Clasz result = Clasz.CreateObject(aDb, conn, aClass);
+	public static <Ty extends Clasz<?>> Ty CreateObjectTransient(Connection conn, Class<Ty> aClass) throws Exception {
+		Ty result = Clasz.CreateObjectTransient(conn, aClass);
 		result.initBeforePopulate();
 		result.initBeforePopulate(conn);
-		return(result);
+		return aClass.cast(result);
 	}
-	*/
 
-	public static Clasz CreateObjectTransient(Connection conn, Class aClass) throws Exception {
-		Clasz result = Clasz.CreateObjectTransient((ObjectBase) conn.getBaseDb(), conn, aClass);
+	public static Clasz<?> CreateObjectTransientFromAnyClass(Connection conn, Class<?> aClass) throws Exception {
+		Clasz<?> result = Clasz.CreateObjectTransientFromAnyClass(conn, aClass);
 		result.initBeforePopulate();
 		result.initBeforePopulate(conn);
-		return(result);
+		return result;
 	}
 
-	public static void SetDbRecursive(Clasz aClasz, ObjectBase aDb) throws Exception {
+	public static void SetDbRecursive(Clasz<?> aClasz, ObjectBase aDb) throws Exception {
 		aClasz.setDb(aDb);
-		Clasz parent = aClasz.getParentObjectByContext();
+		Clasz<?> parent = aClasz.getParentObjectByContext();
 		if (ObjectBase.IsNotAtClaszYet(parent)) {
 			SetDbRecursive(parent, aDb);
 		}
@@ -131,7 +113,7 @@ public class ObjectBase extends Database {
 	 * @param aChild
 	 * @throws Exception 
 	 */
-	public static void createInheritance(Connection aConn, Class aParent, Class aChild) throws Exception {
+	public static void createInheritance(Connection aConn, Class<?> aParent, Class<?> aChild) throws Exception {
 		String ihName = Clasz.GetIhTableName(aChild);
 		Table ihTable = new Table(ihName);
 		String childPkName = Clasz.CreatePkColName(aChild);
@@ -151,7 +133,7 @@ public class ObjectBase extends Database {
 		}
 	}
 
-	public static void InsertInheritance(Connection aConn, Clasz aObject) throws Exception {
+	public static void InsertInheritance(Connection aConn, Clasz<?> aObject) throws Exception {
 		try {
 			String ihName = Clasz.GetIhTableName(aObject.getClass()); // get the inheritance table name for this aObject
 			Table ihTable = new Table(ihName); // Insert into the inheritance table for this object and its parent
@@ -175,7 +157,7 @@ public class ObjectBase extends Database {
 	 * @param aLinkField
 	 * @throws Exception 
 	 */
-	public static void createMemberOfTable(Connection aConn, Class aParent, Class aChild, boolean isChildPolymorphic, String aLinkField) throws Exception {
+	public static void createMemberOfTable(Connection aConn, Class<?> aParent, Class<?> aChild, boolean isChildPolymorphic, String aLinkField) throws Exception {
 		String relationType = Clasz.GetIvTableName(aParent);
 		Table linkTable = new Table(relationType);
 		if (Database.TableExist(aConn, relationType)) { 
@@ -210,26 +192,26 @@ public class ObjectBase extends Database {
 	 * @param aLeafClass
 	 * @throws Exception 
 	 */
-	public static void InsertMemberOf(Connection aConn, Clasz aMasterObject, Field aMemberOid, Field aLeafClass) throws Exception {
+	public static void InsertMemberOf(Connection aConn, Clasz<?> aMasterObject, Field aMemberOid, Field aLeafClass) throws Exception {
 		String relationType = Clasz.GetIvTableName(aMasterObject.getClass());
 		Table linkTable = new Table(relationType); 
 		Record linkRecord = new Record();
 		linkRecord.createField(aMasterObject.getPkName(), aMasterObject.getObjectId());
-		if (aMemberOid.getFieldType() == FieldType.LONG) {
-			linkRecord.createField(aMemberOid.getFieldName(), ((FieldLong) aMemberOid).getValueLong());
-		} else if (aMemberOid.getValueObj() == null) {
-			linkRecord.createField(aMemberOid.getFieldName(), FieldType.LONG);
-			linkRecord.getField(aMemberOid.getFieldName()).setModified(true);
+		if (aMemberOid.getDbFieldType() == FieldType.LONG) {
+			linkRecord.createField(aMemberOid.getDbFieldName(), ((FieldLong) aMemberOid).getValueLong());
+		} else if (aMemberOid.getValueObj(aConn) == null) {
+			linkRecord.createField(aMemberOid.getDbFieldName(), FieldType.LONG);
+			linkRecord.getField(aMemberOid.getDbFieldName()).setModified(true);
 		} else {
 			throw new Hinderance("Invalid field type while attempting to insert a class field relationship in: '" + relationType + "'");
 		}
 		if (aLeafClass != null && aLeafClass.getValueStr(aConn).isEmpty() == false) {
-			linkRecord.createField(aLeafClass.getFieldName(), aLeafClass.getValueStr(aConn));
+			linkRecord.createField(aLeafClass.getDbFieldName(), aLeafClass.getValueStr(aConn));
 		}
 		linkTable.insert(aConn, linkRecord); 
 	}
 
-	public static void InsertBoxMember(Connection aConn, Clasz aMasterObject, String aMemberName,  Long aMemberValue, String aMemberClass) throws Exception {
+	public static void InsertBoxMember(Connection aConn, Clasz<?> aMasterObject, String aMemberName,  Long aMemberValue, String aMemberClass) throws Exception {
 		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aMemberName);
 		Table linkTable = new Table(relationType); 
 		Record linkRecord = new Record();
@@ -241,85 +223,75 @@ public class ObjectBase extends Database {
 		linkTable.insert(aConn, linkRecord); 
 	}
 
-	public void deleteBoxMember(Connection aConn, Clasz aMasterObject, FieldObjectBox aFieldBox, Clasz aMemberObj) throws Exception {
-		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFieldBox.getFieldName());
+	public void deleteBoxMember(Connection aConn, Clasz<?> aMasterObject, FieldObjectBox<?> aFieldBox, Clasz<?> aMemberObj) throws Exception {
+		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFieldBox.getDbFieldName());
 		Table linkTable = new Table(relationType); 
 		Record whereRecord = new Record();
 		whereRecord.createField(aMasterObject.getPkName(), aMasterObject.getObjectId());
-		whereRecord.createField(aFieldBox.getFieldName(), aMemberObj.getObjectId());
+		whereRecord.createField(aFieldBox.getDbFieldName(), aMemberObj.getObjectId());
 		linkTable.delete(aConn, whereRecord); 
 		if (aFieldBox.deleteAsMember()) {
-			ObjectBase.DeleteNoCommit(aConn, aMemberObj);
+			//ObjectBase.DeleteNoCommit(aConn, aMemberObj, aFieldBox.isInline()); // isInline is false, box member inline is not supported yet
+			ObjectBase.DeleteNoCommit(aConn, aFieldBox, aMasterObject, aMemberObj);
 		}
 	}
 
-	public void deleteBoxMember(Connection aConn, Clasz aMasterObject, FieldObjectBox aFieldBox, Long aMemberValue, String aMemberClass) throws Exception {
-		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFieldBox.getFieldName());
+	public void deleteBoxMember(Connection aConn, Clasz<?> aMasterObject, FieldObjectBox<?> aFieldBox, Long aMemberValue, String aMemberClass) throws Exception {
+		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFieldBox.getDbFieldName());
 		Table linkTable = new Table(relationType); 
 		Record whereRecord = new Record();
 		whereRecord.createField(aMasterObject.getPkName(), aMasterObject.getObjectId());
-		whereRecord.createField(aFieldBox.getFieldName(), aMemberValue);
+		whereRecord.createField(aFieldBox.getDbFieldName(), aMemberValue);
 		linkTable.delete(aConn, whereRecord); 
 
 		if (aFieldBox.deleteAsMember()) {
-			Class leafClass = Class.forName(aFieldBox.getDeclareType()); // default to the field object class
+			Class<?> leafClass = Class.forName(aFieldBox.getDeclareType()); // default to the field object class
 			if (aMemberClass != null && aMemberClass.isEmpty() == false) {
 				leafClass = Class.forName(aMemberClass); // if polymorpic replace the default class to polymorphic class
 			}
-			Clasz whereObj = Clasz.CreateObject(this, aConn, leafClass);
+			Clasz<?> whereObj = Clasz.CreateObjectFromAnyClass(aConn, leafClass);
 			whereObj.setObjectId(aMemberValue);
-			Clasz deleteObj = Clasz.Fetch(aConn, whereObj); // will this still Fetch according to the getClassName method????, if it works then yes
+			Clasz<?> deleteObj = Clasz.Fetch(aConn, whereObj); // will this still Fetch according to the getClassName method????, if it works then yes
 			if (deleteObj != null && deleteObj.isPopulated()) {
-				ObjectBase.DeleteNoCommit(aConn, deleteObj);
+				ObjectBase.DeleteNoCommit(aConn, aFieldBox, aMasterObject, deleteObj);
 			}
 		}
 	}
 
 
-	/**
+	/*
 	 * create polymorphic table with prefix ip_ip_<master class name> e.g. 
 	 * ip_person primary key of master class field name inside the master class
 	 * fully qualified leaf class name
 	 * 
+	 */
+
+	/**
+	 * 
 	 * @param aConn
-	 * @param aMasterObject
-	 * @param aField
+	 * @param aMemberField
+	 * @param aLeafField
+	 * @return
 	 * @throws Exception 
 	 */
-	/*
-	@Deprecated
-	public static void UpdatePolymorphic(Connection aConn, Clasz aMasterObject, FieldObject aField) throws Exception {
-		String polymorphicName = Clasz.getPolymorphicTableName(aMasterObject.getClass()); // create the ip_ table name
-		Table updateTable = new Table(polymorphicName); // create the ip_ table
-		updateTable.getMetaRec().createFieldObject(LEAF_CLASS, FieldType.STRING, CLASS_NAME_LEN, aField.getObjectClass(aConn).getName());
-
-		Record whereRecord = new Record();
-		whereRecord.createFieldObject(aMasterObject.getPkName(), aMasterObject.getObjectId());
-		whereRecord.createFieldObject(MEMBER_NAME, FieldType.STRING, MEMBER_NAME_LEN, aField.getFieldName());
-
-		Record dataRecord = new Record();
-		dataRecord.createFieldObject(LEAF_CLASS, FieldType.STRING, CLASS_NAME_LEN, aField.getObjectClass(aConn).getName());
-		dataRecord.getField(LEAF_CLASS).setModified(true);
-		if (updateTable.update(aConn, dataRecord, whereRecord) == 0) {
-			dataRecord.createFieldObject(aMasterObject.getPkName(), aMasterObject.getObjectId());
-			dataRecord.createFieldObject(MEMBER_NAME, FieldType.STRING, MEMBER_NAME_LEN, aField.getFieldName());
-			updateTable.insert(aConn, dataRecord); 
-		}
-	}
-	*/
-
-	public static Class GetEffectiveClass(Connection aConn, FieldObject aMemberField, FieldStr aLeafField) throws Exception {
-		Class result = Class.forName(aMemberField.getDeclareType());
+	private static Class<?> GetEffectiveClass(Connection aConn, FieldObject<?> aMemberField, FieldStr aLeafField) throws Exception {
+		Class<?> result = Class.forName(aMemberField.getDeclareType());
 		if (aMemberField.isPolymorphic()) {
-			String strLeafClass = aLeafField.getValueStr();
-			result = Class.forName(strLeafClass);
+			try {
+				String strLeafClass = aLeafField.getValueStr();
+				if (strLeafClass != null && strLeafClass.isBlank() == false) {
+					result = Class.forName(strLeafClass);
+				}
+			} catch (Exception ex) {
+				throw new Hinderance(ex, "For field: " + aMemberField.getCamelCaseName() + ", fail to get effective leaf class: " + aLeafField.getValueStr());
+			}
 		}
 		return(result);
 	}
 
-	public static Class GetEffectiveClass(Connection aConn, Clasz aMasterObject, FieldObject aMemberField) throws Exception {
-		Class result = Class.forName(aMemberField.getDeclareType());
-		String memberName = aMemberField.getFieldName();
+	public static Class<?> GetEffectiveClass(Connection aConn, Clasz<?> aMasterObject, FieldObject<?> aMemberField) throws Exception {
+		Class<?> result = Class.forName(aMemberField.getDeclareType());
+		String memberName = aMemberField.getDbFieldName();
 		String leafClassColName = Clasz.CreateLeafClassColName(memberName);	
 		String relationType = Clasz.GetIvTableName(aMasterObject.getClass()); // get the iv_ table name
 		Table linkTable = new Table(relationType); // create the iv_ table instant
@@ -335,27 +307,6 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	/*
-	@Deprecated
-	public static Class getPolymorphicClass(Connection aConn, Clasz aMasterObject, FieldObject aField) throws Exception {
-		Class result = Class.forName(aField.getDeclareType());
-		if (aField.isPolymorphic()) {
-			String linkName = Clasz.getPolymorphicTableName(aMasterObject.getClass()); // create the ip_ table name
-			Table linkTable = new Table(linkName); // create the ip_ table
-			Record whereRecord = new Record();
-			whereRecord.createFieldObject(aMasterObject.getPkName(), aMasterObject.getObjectId());
-			whereRecord.createFieldObject(MEMBER_NAME, FieldType.STRING, MEMBER_NAME_LEN, aField.getFieldName());
-			linkTable.getMetaRec().createFieldObject(LEAF_CLASS, FieldType.STRING, CLASS_NAME_LEN);
-			linkTable.fetch(aConn, whereRecord); 
-			if (linkTable.totalRecord() == 1) {
-				String className = linkTable.getRecord(0).getFieldStr(LEAF_CLASS).getValueStr();
-				result = Class.forName(className);
-			}
-		}
-		return(result);
-	}
-	*/
-
 	/**
 	 * Update the relationship of "instant variable" for a Clasz. This update
 	 * is for one "instant variable".
@@ -365,43 +316,42 @@ public class ObjectBase extends Database {
 	 * @param aMemberField
 	 * @throws Exception 
 	 */
-	public void updateMemberOf(Connection aConn, Clasz aMasterObject, FieldObject aMemberField) throws Exception {
-		Clasz memberObj = aMemberField.getObj();
-		String memberName = aMemberField.getFieldName();
+	public void updateMemberOf(Connection aConn, Clasz<?> aMasterObject, FieldObject<?> aMemberField) throws Exception {
+		Clasz<?> memberObj = aMemberField.getObj();
+		String parentName = aMasterObject.getClass().getSimpleName();
+		String memberDbFieldName = aMemberField.getDbFieldName();
+		String memberFieldName = aMemberField.getCamelCaseName();
 		String relationType = Clasz.GetIvTableName(aMasterObject.getClass()); // get the iv_ table name
 		Table linkTable = new Table(relationType); // create the iv_ table
-		linkTable.getMetaRec().createField(memberName, FieldType.LONG);
+		linkTable.getMetaRec().createField(memberDbFieldName, FieldType.LONG);
 
 		String leafClassColName = null;
 		if (aMemberField.isPolymorphic()) {
-				leafClassColName = Clasz.CreateLeafClassColName(memberName);	
-				linkTable.getMetaRec().createField(leafClassColName, FieldType.STRING, CLASS_NAME_LEN);
+			leafClassColName = Clasz.CreateLeafClassColName(memberDbFieldName);	
+			linkTable.getMetaRec().createField(leafClassColName, FieldType.STRING, CLASS_NAME_LEN);
 		}
 
 		Record whereRecord = new Record();
 		whereRecord.createField(aMasterObject.getPkName(), aMasterObject.getObjectId());
 
-		if (memberObj == null) { // when member is null, its because it was not Fetch from db at all, so just ignore it, hence to remove member object.... KIV, user need to mark it???
-			// do nothing....
-		} else if (aMemberField.isForDelete()) {
+		if (aMemberField.isForDelete() || (aMemberField.isModified() && memberObj == null)) { // field mark for deletion or user set field obj to null indicating intention to delete
 			linkTable.fetch(aConn, whereRecord); 
 			if (linkTable.totalRecord() == 1) {
 				if (aMemberField.deleteAsMember()) {
-					//Class deleteClass = getPolymorphicClass(aConn, aMasterObject, aMemberField);
-					Class deleteClass = GetEffectiveClass(aConn, aMemberField, (FieldStr) linkTable.getRecord(0).getField(leafClassColName));
-					Clasz oldMember = Clasz.CreateObject(this, aConn, deleteClass); // create the previous object to be deleted
-					Long oldMemberId = linkTable.getRecord(0).getFieldLong(memberName).getValueLong();
+					Class<?> deleteClass = GetEffectiveClass(aConn, aMemberField, (FieldStr) linkTable.getRecord(0).getField(leafClassColName));
+					Clasz<?> oldMember = Clasz.CreateObjectFromAnyClass(aConn, deleteClass); 
+					Long oldMemberId = linkTable.getRecord(0).getFieldLong(memberDbFieldName).getValueLong();
 					oldMember.setObjectId(oldMemberId);
-					Clasz forDelete = Clasz.Fetch(aConn, oldMember);
+					Clasz<?> forDelete = Clasz.Fetch(aConn, oldMember);
 					if (forDelete != null && forDelete.isPopulated()) {
-						ObjectBase.DeleteNoCommit(aConn, forDelete);
+						DeleteNoCommit(aConn, forDelete);
 					}
 				}
 
 				// for deleting member field, we empty their member's primary key from the iv_ tables
-				linkTable.getRecord(0).removeField(memberName);
-				linkTable.getRecord(0).createField(memberName, FieldType.LONG);
-				linkTable.getRecord(0).getField(memberName).setModified(true);
+				linkTable.getRecord(0).removeField(memberDbFieldName);
+				linkTable.getRecord(0).createField(memberDbFieldName, FieldType.LONG);
+				linkTable.getRecord(0).getField(memberDbFieldName).setModified(true);
 
 				// for deleting member field, we empty the leaf class too
 				Field fieldLeafClass = null;
@@ -412,13 +362,13 @@ public class ObjectBase extends Database {
 				}
 
 				if (linkTable.update(aConn, linkTable.getRecord(0), whereRecord) == 0) {
-					Field memberOid = linkTable.getRecord(0).getField(memberName);
+					Field memberOid = linkTable.getRecord(0).getField(memberDbFieldName);
 					InsertMemberOf(aConn, aMasterObject, memberOid, fieldLeafClass);
 				}
 			}
-		} else {
+		} else { // is insert orupdate new member 
 			Long memberId = memberObj.getObjectId();
-			FieldLong memberField = new FieldLong(memberName);
+			FieldLong memberField = new FieldLong(memberDbFieldName);
 			memberField.setValueLong(memberId);
 
 			FieldStr memberLeaf = null;
@@ -432,29 +382,33 @@ public class ObjectBase extends Database {
 				if (linkTable.totalRecord() == 0) { // there is no such member exist for this master object
 					InsertMemberOf(aConn, aMasterObject, memberField, memberLeaf);
 				} else if (linkTable.totalRecord() == 1) { // there is one Fetch record for this instant variable
-					Long oldMemberId = linkTable.getRecord(0).getFieldLong(memberName).getValueLong();
+					Long oldMemberId = linkTable.getRecord(0).getFieldLong(memberDbFieldName).getValueLong();
 					if (oldMemberId == null || oldMemberId.equals(memberId) == false) {
 						if (oldMemberId != null && aMemberField.deleteAsMember()) {
-							Clasz delCriteria = Clasz.CreateObject(this, aConn, memberObj.getClass()); // create the previous object to be deleted
+							Clasz<?> delCriteria = Clasz.CreateObject(aConn, memberObj.getClass()); // create the previous object to be deleted
 							delCriteria.setObjectId(oldMemberId);
-							Clasz forDelete = Clasz.Fetch(aConn, memberObj.getClass().cast(delCriteria));
+							Clasz<?> forDelete = Clasz.Fetch(aConn, memberObj.getClass().cast(delCriteria));
 							if (forDelete != null && forDelete.isPopulated()) {
-								ObjectBase.DeleteNoCommit(aConn, forDelete);
+								DeleteNoCommit(aConn, forDelete);
 							}
 						}
 
-						linkTable.getRecord(0).getFieldLong(memberName).setValueLong(memberId);
-						if (aMemberField.isPolymorphic()) {
-							String leafName = memberLeaf.getFieldName();
+						linkTable.getRecord(0).getFieldLong(memberDbFieldName).setValueLong(memberId);
+						if (aMemberField.isPolymorphic() && memberLeaf != null) {
+							String leafName = memberLeaf.getDbFieldName();
 							String leafClass = memberLeaf.getValueStr(aConn);
 							linkTable.getRecord(0).getFieldStr(leafName).setValueStr(leafClass);
+						} else if (aMemberField.isPolymorphic() == false) { // not polymorphic, do nohting
+							// do nothing
+						} else { // is polymorphic, but no leaf class, possible??
+							throw new Hinderance("Member leaf is null, member field name: " + parentName + "." + memberFieldName);
 						}
 						if (linkTable.update(aConn, linkTable.getRecord(0), whereRecord) == 0) { // now update to the latest member
 							InsertMemberOf(aConn, aMasterObject, memberField, memberLeaf); 
 						}
 					}
 				} else {
-					throw new Hinderance("Error, object: " + aMasterObject.getClass().getName() + ", got mulitiple instant variable of: " + memberName + ", id: " + aMasterObject.getObjectId());
+					throw new Hinderance("Error, object: " + aMasterObject.getClass().getName() + ", got mulitiple instant variable of: " + memberDbFieldName + ", id: " + aMasterObject.getObjectId());
 				}
 			}
 		}
@@ -480,44 +434,39 @@ public class ObjectBase extends Database {
 	 * Those objects in the database that do not exist anymore in the array
 	 * is deleted. This is in compareDisk2Memory method below.
 	 * 
+	 * @param <Ty>
 	 * @param aConn
 	 * @param aMasterObject
-	 * @param aField
+	 * @param aFobField
 	 * @param aAvoidRecursive
 	 * @throws Exception 
 	 */
-	public void updateBoxMember(Connection aConn, Clasz aMasterObject, FieldObjectBox aField, CopyOnWriteArrayList<Clasz> aAvoidRecursive) throws Exception {
-		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aField.getFieldName()); // get the iv_ table name
+	public <Ty extends Clasz<?>> void updateBoxMember(Connection aConn, Clasz<?> aMasterObject, FieldObjectBox<Ty> aFobField, CopyOnWriteArrayList<Clasz<?>> aAvoidRecursive) throws Exception {
+		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFobField.getDbFieldName()); // get the iv_ table name
 		Table linkTable = new Table(relationType); // create the iv_ table
 		linkTable.getMetaRec().createField(aMasterObject.getPkName(), FieldType.LONG);
-		linkTable.getMetaRec().createField(aField.getFieldName(), FieldType.LONG);
+		linkTable.getMetaRec().createField(aFobField.getDbFieldName(), FieldType.LONG);
 		linkTable.getMetaRec().createField(ObjectBase.LEAF_CLASS, FieldType.STRING, CLASS_NAME_LEN);
 		Record whereRecord = new Record();
 		whereRecord.createField(aMasterObject.getPkName(), aMasterObject.getObjectId());
 		linkTable.fetch(aConn, whereRecord); // fetches ALL entries in the disk for this master object
 
-		crudEachMember(aConn, aMasterObject, aField, linkTable, aAvoidRecursive);
-		//compareDisk2Memory(aConn, aMasterObject, aField, linkTable);
+		crudEachMember(aConn, aMasterObject, aFobField, linkTable, aAvoidRecursive);
 	}
 
-	public void crudEachMember(Connection aConn, Clasz aMasterObject, FieldObjectBox aField, Table linkTable, CopyOnWriteArrayList<Clasz> aAvoidRecursive) throws Exception {
-		for (Clasz memberObject : ((FieldObjectBox) aField).getObjectMap().values()) {
+	public <Ty extends Clasz<?>> void crudEachMember(Connection aConn, Clasz<?> aMasterObject, FieldObjectBox<Ty> aFobField, Table linkTable, CopyOnWriteArrayList<Clasz<?>> aAvoidRecursive) throws Exception {
+		for (Ty memberObject : aFobField.getObjectMap().values()) {
 			if (memberObject.getForDelete() == true) {
-				this.deleteBoxMember(aConn, aMasterObject, aField, memberObject);
+				this.deleteBoxMember(aConn, aMasterObject, aFobField, memberObject);
 			} else {
-				CopyOnWriteArrayList<Clasz> avoidRecursive = (CopyOnWriteArrayList<Clasz>) aAvoidRecursive.clone();
+				CopyOnWriteArrayList<Clasz<?>> avoidRecursive = new CopyOnWriteArrayList<>(aAvoidRecursive);
 				this.persist(aConn, memberObject, false, avoidRecursive); // Insert/update the member object into the database
 				Long memberId = memberObject.getObjectId();
 				if (memberId != Clasz.NOT_INITIALIZE_OBJECT_ID) {
-					if (IsMember(linkTable, aField.isPolymorphic(), aField.getFieldName(), memberId, ObjectBase.LEAF_CLASS, memberObject.getClass().getName()) == false) { // there is no such member exist in the database for this memeber, so Insert this new entry
+					if (IsMember(linkTable, aFobField.isPolymorphic(), aFobField.getDbFieldName(), memberId, ObjectBase.LEAF_CLASS, memberObject.getClass().getName()) == false) { // there is no such member exist in the database for this memeber, so Insert this new entry
 						String polymorphicName = null;
-						/*
-						if (aField.isPolymorphic()) {
-							polymorphicName = memberObject.getClass().getName();
-						}
-						*/
 						polymorphicName = memberObject.getClass().getName(); // polymorphic or not, we still fill this field with the clasz type
-						InsertBoxMember(aConn, aMasterObject, aField.getFieldName(), memberId, polymorphicName); // Insert the relationship of master object to the member object
+						InsertBoxMember(aConn, aMasterObject, aFobField.getDbFieldName(), memberId, polymorphicName); // Insert the relationship of master object to the member object
 					}
 				} else {
 					// throw new Hinderance("Cannot set member object of: " + aField.getDeclareType() + ", for parent: " + aMasterObject.getClaszName());
@@ -545,9 +494,9 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public void compareDisk2Memory(Connection aConn, Clasz aMasterObject, FieldObjectBox aFieldBox, Table linkTable) throws Exception {
+	public void compareDisk2Memory(Connection aConn, Clasz<?> aMasterObject, FieldObjectBox<?> aFieldBox, Table linkTable) throws Exception {
 		for(Record rec : linkTable.getRecordBox().values()) {
-			Long memberId = rec.getFieldLong(aFieldBox.getFieldName()).getValueLong(); // object id of the member from the disk
+			Long memberId = rec.getFieldLong(aFieldBox.getDbFieldName()).getValueLong(); // object id of the member from the disk
 			if (aFieldBox.containObjectId(memberId) == false) { // this entry from the disk is not in the map, user have removed it, so remove it from database
 				String memberClass = "";
 				if (rec.fieldExist(LEAF_CLASS)) {
@@ -556,11 +505,6 @@ public class ObjectBase extends Database {
 				this.deleteBoxMember(aConn, aMasterObject, aFieldBox, memberId, memberClass);
 			}
 		}
-	}
-
-	public static void DeleteObject(Connection aConn, Class aClass, Long aObjId) throws Exception {
-		Clasz objectToDelete = ObjectBase.FetchObject(aConn, aClass, aObjId);
-		ObjectBase.DeleteNoCommit(aConn, objectToDelete);
 	}
 
 	/**
@@ -574,38 +518,6 @@ public class ObjectBase extends Database {
 	 * @return
 	 * @throws Exception 
 	 */
-	public int deleteObject(Clasz aObject) throws Exception {
-		int result;
-
-		Clasz objectToDelete; // if this object is a where object, then Fetch the object first to properly populate the object
-		if (aObject.isPopulated() == false) {
-			objectToDelete = this.fetchObject(aObject);
-		} else {
-			objectToDelete = aObject;
-		}
-
-		Connection conn = null;
-		try {
-			conn = this.connPool.getConnection();
-			boolean commit = conn.getAutoCommit();
-			conn.setAutoCommit(false);
-			result = DeleteObject(conn, objectToDelete, 0);
-			if (conn.getAutoCommit() == false) {
-				conn.commit(); // only commit when all parent, child, inheritance relationship are all propery inserted
-			}
-			conn.setAutoCommit(commit);
-		} catch(Exception ex) {
-			if (conn != null) {
-				conn.rollback();
-			}
-			throw(ex);
-		} finally {
-			if (conn != null) {
-				this.connPool.freeConnection(conn);
-			}
-		}
-		return(result);
-	}
 
 	/**
 		Delete an object from the database, the object to be deleted must not
@@ -641,32 +553,32 @@ public class ObjectBase extends Database {
 	 * @return
 	 * @throws Exception 
 	 */
-	public static int DeleteCommit(Connection aConn, Clasz aObject) throws Exception {
+	public static Integer DeleteCommit(Connection aConn, Clasz<?> aObject) throws Exception {
 		int result;
-		Clasz objectToDelete; // if this object is a where object, then Fetch the object first to properly populate the object
+		Clasz<?> objectToDelete; // if this object is a where object, then Fetch the object first to properly populate the object
 		if (aObject.isPopulated() == false) {
 			objectToDelete = ObjectBase.FetchObject(aConn, aObject);
 		} else {
 			objectToDelete = aObject;
 		}
+
+		boolean prevAutoCommit = aConn.getAutoCommit();
+		aConn.setAutoCommit(false);
 		try {
-			boolean commit = aConn.getAutoCommit();
-			aConn.setAutoCommit(false);
 			result = DeleteObject(aConn, objectToDelete, 0);
-			if (aConn.getAutoCommit() == false) {
-				aConn.commit(); // only commit when all parent, child, inheritance relationship are all propery inserted
-			}
-			aConn.setAutoCommit(commit);
+			aConn.commit(); 
 		} catch(Exception ex) {
 			aConn.rollback();
-			throw new Hinderance(ex, "Fail to delete object, commit mode: clasz");
+			throw new Hinderance(ex, "Fail to delete and commit object, all transction rollback, clasz: " + aObject.getClass().getSimpleName());
+		} finally {
+			aConn.setAutoCommit(prevAutoCommit);
 		}
 		return(result);
 	}
 
-	public static Integer DeleteNoCommit(Connection aConn, Clasz aObject) throws Exception {
+	public static Integer DeleteNoCommit(Connection aConn, Clasz<?> aObject) throws Exception {
 		Integer result = null;
-		Clasz objectToDelete; // if this object is a where object, then Fetch the object first to properly populate the object
+		Clasz<?> objectToDelete; // if this object is a where object, then Fetch the object first to properly populate the object
 		if (aObject.isPopulated() == false) {
 			objectToDelete = ObjectBase.FetchObject(aConn, aObject);
 		} else {
@@ -684,17 +596,60 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	private static int DeleteObject(Connection aConn, Clasz aObject, int deletedChild) throws Exception {
+	public static int DeleteNoCommit(Connection aConn , FieldObjectBox<?> aFob , Clasz<?> aMasterClasz , Clasz<?> aMemberClasz) throws Exception {
+		int result = 0;
+		if (aFob.isInline() == false) {
+			DeleteNoCommit(aConn, aMemberClasz);
+		} else {
+			throw new Hinderance("Current version do not support inline FOB");
+		}
+		return(result);
+	}
+
+	public static int DeleteInlineField(Connection aConn, FieldObject<?> aField2Delete) throws Exception {
+		/*
+		if (aField2Delete.getFieldType() == FieldType.OBJECT) { // inline field will have flattend fields and it's object
+		} else {
+			throw new Hinderance("Inline field to delete must be OBJECT type with flattend fields, programming error!");
+		}
+		*/
+		int result = 0;
+		Record recUpdField = new Record(); // create record for atomic inline field to update
+		Clasz<?> masterClasz = aField2Delete.getMasterObject();
+		Record recUpdWhere = new Record();
+		recUpdWhere.createField(aConn, masterClasz.getField(masterClasz.getPkName())); // update from the pk value
+		recUpdWhere.copyValue(aConn, masterClasz.getField(masterClasz.getPkName())); 
+
+		// inline field have no support for ObjectIndex yet, so not doing any index delete
+
+		Clasz<?> clasz2Inline = ((FieldObject<?>) aField2Delete).getObj(); // inline field will have flattend fields and it's object
+		for (Field eachField : clasz2Inline.getInstantRecord().getFieldBox().values()) { 
+			if (eachField.getDbFieldType() != FieldType.OBJECT && eachField.isSystemField() == false) { // ignore structured object, only process flatten inline field
+				Field field2Null = recUpdField.createField(aConn, eachField);
+				field2Null.setDbFieldName(aField2Delete.getDbFieldName() + "_" + field2Null.getDbFieldName());
+				field2Null.setValue(null);
+			}
+		}
+
+		result = masterClasz.update(aConn, recUpdField, recUpdWhere); 
+		if (result != 1) {
+			throw new Hinderance("Fail deleting inline field, non unique master record found for clasz: '" + masterClasz.getClass().getSimpleName() + "'");
+		}
+
+		return(result);
+	}
+
+	private static int DeleteObject(Connection aConn, Clasz<?> aObject, int deletedChild) throws Exception {
 		int result;
 
-		int totalDeletedMember = DeleteMemberOf(aConn, aObject); // deleteCommit all this object member first
+		DeleteMemberOf(aConn, aObject); // delete all this object member first
 
 		Record recWhere = new Record();
-		recWhere.createField(aObject.getField(aObject.getPkName())); // DeleteCommit from the pk value
-		recWhere.copyValue(aObject.getField(aObject.getPkName())); 
+		recWhere.createField(aConn, aObject.getField(aObject.getPkName())); // Delete from the pk value
+		recWhere.copyValue(aConn, aObject.getField(aObject.getPkName())); 
 
-		recWhere.createField(aObject.getField(aObject.createChildCountColName())); // only DeleteCommit when object doesn't have any child object
-		recWhere.getFieldInt(aObject.createChildCountColName()).setValueInt(deletedChild); // reduce by the total deleted child, if its 0, then it has no children, so can DeleteCommit it
+		recWhere.createField(aConn, aObject.getField(aObject.createChildCountColName())); // only Delete when object doesn't have any child object
+		recWhere.getFieldInt(aObject.createChildCountColName()).setValueInt(deletedChild); // reduce by the total deleted child, if its 0, then it has no children, so can Delete it
 		recWhere.getField(aObject.createChildCountColName()).setFormulaStr(aObject.getChildCountNameFull(aConn) + " - ? <= 0");
 
 		result = aObject.delete(aConn, recWhere);
@@ -706,34 +661,34 @@ public class ObjectBase extends Database {
 
 		if (result == 1) {
 			if (ObjectBase.ParentIsNotAtClaszYet(aObject)) {
-				Clasz parentObject = aObject.getParentObjectByContext(); // DeleteCommit the ih_* table if this object has inheritance relationship
+				Clasz<?> parentObject = aObject.getParentObjectByContext(); // Delete the ih_* table if this object has inheritance relationship
 				if (parentObject != null ) { // null means is not at Clasz yet bcos it has inheritance parent class but no parent object is set, proabably because it has inherited an abstract class
 					if (parentObject.isPopulated()) {
-						Record recWhereIh = new Record(); // to DeleteCommit the inheritance table entry, it needs the pk of the both parent and child table 
-						recWhereIh.createField(aObject.getField(aObject.getPkName()));
-						recWhereIh.copyValue(aObject.getField(aObject.getPkName()));
+						Record recWhereIh = new Record(); // to Delete the inheritance table entry, it needs the pk of the both parent and child table 
+						recWhereIh.createField(aConn, aObject.getField(aObject.getPkName()));
+						recWhereIh.copyValue(aConn, aObject.getField(aObject.getPkName()));
 			
-						recWhereIh.createField(parentObject.getField(parentObject.getPkName()));
-						recWhereIh.copyValue(parentObject.getField(parentObject.getPkName()));
+						recWhereIh.createField(aConn, parentObject.getField(parentObject.getPkName()));
+						recWhereIh.copyValue(aConn, parentObject.getField(parentObject.getPkName()));
 						String ihName = Clasz.GetIhTableName(aObject.getClass());
 						Table ihTable = new Table(ihName);
 						ihTable.delete(aConn, recWhereIh);
 					}
-					DeleteObject(aConn, parentObject, 1); // recursively call Insert, now try to DeleteCommit the parent object
+					DeleteObject(aConn, parentObject, 1); // recursively call Insert, now try to Delete the parent object
 				}
 			}
 		} else { // if nothing is deleted, we stop traversing the inheritance tree upwards, probably because the object still have child object to it, if so update the parent record
 			if (deletedChild == 0) {
 				// its deleted by others or when one class having 2 same member, so silently ignore it
 			}
-			else { // cannot DeleteCommit the parent record, so update its child count value
+			else { // cannot Delete the parent record, so update its child count value
 				Record recUpdWhere = new Record();
-				recUpdWhere.createField(aObject.getField(aObject.getPkName())); // update from the pk value
-				recUpdWhere.copyValue(aObject.getField(aObject.getPkName())); 
+				recUpdWhere.createField(aConn, aObject.getField(aObject.getPkName())); // update from the pk value
+				recUpdWhere.copyValue(aConn, aObject.getField(aObject.getPkName())); 
 
 				Record recUpdField = new Record();
-				recUpdField.createField(aObject.getField(aObject.createChildCountColName())); // only DeleteCommit when object doesn't have any child object
-				recUpdField.getFieldInt(aObject.createChildCountColName()).setValueInt(deletedChild); // reduce by 1, if its 0, then it has no children, so can DeleteCommit it
+				recUpdField.createField(aConn, aObject.getField(aObject.createChildCountColName())); // only Delete when object doesn't have any child object
+				recUpdField.getFieldInt(aObject.createChildCountColName()).setValueInt(deletedChild); // reduce by 1, if its 0, then it has no children, so can Delete it
 				recUpdField.getField(aObject.createChildCountColName()).setFormulaStr(aObject.getChildCountNameFull(aConn) + " - ?");
 
 				result = aObject.update(aConn, recUpdField, recUpdWhere); 
@@ -757,37 +712,31 @@ public class ObjectBase extends Database {
 	 * @param aMaster
 	 * @throws Exception 
 	 */
-	private static int DeleteMemberOf(Connection aConn, Clasz aMaster) throws Exception {
+	private static int DeleteMemberOf(Connection aConn, Clasz<?> aMaster) throws Exception {
 		int result = 0;
 		boolean gotInstantVariable = false;
-		for (Field eachField : aMaster.getRecord().getFieldBox().values()) { // for each of this member, 
-				if (eachField.isInline() == false) {
-					if (eachField.getFieldType() == FieldType.OBJECT) {
-						gotInstantVariable = true; // if got member of relationship, remove them from the iv_* table
-						if (eachField.deleteAsMember()) {
-							Clasz memberObj = ((FieldObject) eachField).getValueObj(aConn);
-							/*
-							if (memberObj.getClaszName().equals("Clasz")) {
-								memberObj = ((FieldObject) eachField).getValueObj();
-							}
-							*/
+		for (Field eachField : aMaster.getInstantRecord().getFieldBox().values()) { // for each of this member, 
+			if (eachField.getDbFieldType() == FieldType.OBJECT || eachField.getDbFieldType() == FieldType.OBJECTBOX) {
+				if (eachField.deleteAsMember()) {
+					if (eachField.isInline() == false) {
+						if (eachField.getDbFieldType() == FieldType.OBJECT) {
+							gotInstantVariable = true; // if got member of relationship, remove them from the iv_* table
+							Clasz<?> memberObj = ((FieldObject<?>) eachField).getValueObj(aConn);
 							if (memberObj != null) {
 								ObjectBase.DeleteNoCommit(aConn, memberObj);
 								result++;
 							} else {
 								// not populated because there is no such member for this field, so just ignore
 							}
-						}
-					} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
-						if (eachField.deleteAsMember()) {
-							if (((FieldObjectBox) eachField).getMetaObj().getClaszName().equals("Clasz") || ((FieldClasz) eachField).getFetchStatus() == FetchStatus.SOF) {
-								((FieldObjectBox) eachField).fetchAll(aConn);
+						} else if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
+							if (((FieldObjectBox<?>) eachField).getMetaObj().getClaszName().equals("Clasz") || ((FieldClasz) eachField).getFetchStatus() == FetchStatus.SOF) {
+								((FieldObjectBox<?>) eachField).fetchAll(aConn);
 							} else if (((FieldClasz) eachField).isPrefetch() == false) { // KIV, instead of Fetch all when prefetch is false, we can use Fetch by batch?
-								((FieldObjectBox) eachField).removeAll(); // remove all the objects from the map
-								((FieldObjectBox) eachField).fetchAll(aConn);
+								((FieldObjectBox<?>) eachField).removeAll(); // remove all the objects from the map
+								((FieldObjectBox<?>) eachField).fetchAll(aConn);
 							}
 
-							for (Clasz eachMember : ((FieldObjectBox) eachField).getObjectMap().values()) {
+							for (Clasz<?> eachMember : ((FieldObjectBox<?>) eachField).getObjectMap().values()) {
 								if (eachMember.isPopulated()) {
 									ObjectBase.DeleteNoCommit(aConn, eachMember);
 									result++;
@@ -795,12 +744,15 @@ public class ObjectBase extends Database {
 									// not populated because there is no such member for this field, so just ignore 
 								}
 							}
+							DeleteBoxMember(aConn, aMaster, (FieldObjectBox<?>) eachField);
+						} else {
+							// atomic field, don't do anything
 						}
-						DeleteBoxMember(aConn, aMaster, (FieldObjectBox) eachField);
-					} else {
-						// atomic field, don't do anything
+					} else { // handle inline delete
+						DeleteInlineField(aConn, (FieldObject<?>) eachField);
 					}
 				}
+			}
 		}
 
 		if (gotInstantVariable) {
@@ -812,26 +764,26 @@ public class ObjectBase extends Database {
 
 	/**
 	 * Remove ALL the entries in the iv_* table for this master
- object, there's another DeleteBoxMember table that DeleteCommit individual
- iv_* table entries.
+	 * object, there's another DeleteBoxMember table that DeleteCommit individual
+	 * iv_* table entries.
 	 * 
 	 * @param aConn
 	 * @param aMasterObject
 	 * @param aFieldBox
 	 * @throws Exception 
 	 */
-	public static void DeleteBoxMember(Connection aConn, Clasz aMasterObject, FieldObjectBox aFieldBox) throws Exception {
-		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFieldBox.getFieldName());
+	public static void DeleteBoxMember(Connection aConn, Clasz<?> aMasterObject, FieldObjectBox<?> aFieldBox) throws Exception {
+		String relationType = Clasz.GetIwTableName(aMasterObject.getClass(), aFieldBox.getDbFieldName());
 		Table linkTable = new Table(relationType); 
 		Record whereRecord = new Record();
 		whereRecord.createField(aMasterObject.getPkName(), aMasterObject.getObjectId());
 		linkTable.delete(aConn, whereRecord); 
 	}
 
-	public static void DeleteAllMember(Connection aConn, Clasz aMaster) throws Exception {
+	public static void DeleteAllMember(Connection aConn, Clasz<?> aMaster) throws Exception {
 		Record recWhereIv = new Record(); 
-		recWhereIv.createField(aMaster.getField(aMaster.getPkName()));
-		recWhereIv.copyValue(aMaster.getField(aMaster.getPkName()));
+		recWhereIv.createField(aConn, aMaster.getField(aMaster.getPkName()));
+		recWhereIv.copyValue(aConn, aMaster.getField(aMaster.getPkName()));
 
 		String ivName = Clasz.GetIvTableName(aMaster.getClass());
 		Table ivTable = new Table(ivName);
@@ -840,7 +792,7 @@ public class ObjectBase extends Database {
 
 	/*
 	@Deprecated
-	public static void deleteAllPolymorphic(Connection aConn, Clasz aMaster) throws Exception {
+	public static void deleteAllPolymorphic(Connection aConn, Clasz<?> aMaster) throws Exception {
 		String ipName = Clasz.getPolymorphicTableName(aMaster.getClass());
 		if (Database.TableExist(aConn, ipName)) {
 			Record recWhereIp = new Record(); 
@@ -857,34 +809,36 @@ public class ObjectBase extends Database {
 	 * all the Insert/update of the object that consist of records from multiple
 	 * table as a single transaction.
 	 * 
+	 * @param aConn
 	 * @param aObject
+	 * @return 
 	 * @throws Exception 
 	 */
-	public static Long PersistCommit(Connection aConn, Clasz aObject) throws Exception {
+	public static Long PersistCommit(Connection aConn, Clasz<?> aObject) throws Exception {
 		Long result = null;
+		boolean prevAutoCommit = aConn.getAutoCommit();
+		aConn.setAutoCommit(false);
 		try {
-			boolean commit = aConn.getAutoCommit();
-			aConn.setAutoCommit(false);
 			result = ((ObjectBase) aConn.getBaseDb()).persist(aConn, aObject, false);
-			if (aConn.getAutoCommit() == false) {
-				aConn.commit(); // only commit when all parent, child, inheritance relationship are all propery inserted
-			} 
-			aConn.setAutoCommit(commit);
+			aConn.commit(); 
 		} catch(Exception ex) {
-			if (aConn != null) aConn.rollback();
-			throw new Hinderance(ex, "Persist fail, transaction have been rollback");
+			aConn.rollback();
+			throw new Hinderance(ex, "Persist fail, transaction rollback, clasz: " + aObject.getClass().getSimpleName());
+		} finally {
+			aConn.setAutoCommit(prevAutoCommit);
 		}
 		return(result);
 	}
 
-	public static Long PersistNoCommit(Connection aConn, Clasz aObject) throws Exception {
+	public static Long PersistNoCommit(Connection aConn, Clasz<?> aObject) throws Exception {
 		Long result = null;
+		//boolean prevAutoCommit = aConn.getAutoCommit();
 		try {
 			result = ((ObjectBase) aConn.getBaseDb()).persist(aConn, aObject, false);
 		} catch(Exception ex) {
-			if (aConn != null) {
-				throw new Hinderance(ex, "Persist fail, transaction have been rollback");
-			}
+			throw new Hinderance(ex, "Persist fail, transaction rollback, clasz: " + aObject.getClass().getSimpleName());
+		} finally {
+			//aConn.setAutoCommit(prevAutoCommit); // can't do this as it'll commit the transaction, caller to this method must handle it's autoCommit instead
 		}
 		return(result);
 	}
@@ -897,40 +851,64 @@ public class ObjectBase extends Database {
 	 * @param aConn
 	 * @throws Exception 
 	 */
-	public static void tree2Inline(Clasz aRoot, Connection aConn) throws Exception {
-		for (Field eachField : aRoot.getRecord().getFieldBox().values()) { 
-			if (eachField.isInline() && eachField.getFieldType() == FieldType.OBJECT) { 
-				Clasz.PopulateInlineField(aRoot, (FieldObject) eachField, eachField.getFieldName(), "flat");
+	public static void Tree2Inline(Clasz<?> aRoot, Connection aConn) throws Exception {
+		for (Field eachField : aRoot.getInstantRecord().getFieldBox().values()) { 
+			if (eachField.isInline() && eachField.getDbFieldType() == FieldType.OBJECT) { 
+				Clasz.PopulateInlineField(aConn, aRoot, (FieldObject<?>) eachField, eachField.getDbFieldName(), "flat");
 			}
 		}
 	}
 
-	public static void tree2Inline(Connection aConn, Clasz aRoot, Clasz aMaster, String aFlattedFieldName) throws Exception {
-		for (Field eachField : aMaster.getRecord().getFieldBox().values()) { 
-			if (eachField.getFieldType() == FieldType.OBJECT) { 
-				Clasz memberObj = (Clasz)((FieldObject) eachField).getValueObj(aConn);
-				String flatFieldName = Clasz.CreateDbFieldName(eachField.getFieldName(), aFlattedFieldName); 
-				tree2Inline(aConn, aRoot, memberObj, flatFieldName); // recursive to process the field, once inline all subsequent field in thie obj is inline
-			} else if (eachField.getFieldType() == FieldType.OBJECTBOX) { 
+	public static List<Field> FlattenInlineField(Connection aConn, Field aField2Inline) throws Exception {
+		List<Field> flattenFieldList = new CopyOnWriteArrayList<>();
+		if (aField2Inline.getDbFieldType() == FieldType.OBJECT) { 
+			Clasz<?> clasz2Inline = ((FieldObject<?>) aField2Inline).getObj();
+			flattenFieldList = FlattenInlineField(aConn, clasz2Inline, aField2Inline.getDbFieldName(), flattenFieldList);
+		} else if (aField2Inline.getDbFieldType() == FieldType.OBJECTBOX) { 
+			int cntr = 0;
+			for (Clasz<?> eachMember : ((FieldObjectBox<?>) aField2Inline).getObjectMap().values()) {
+				flattenFieldList = FlattenInlineField(aConn, eachMember, cntr + "_" + aField2Inline.getDbFieldName(), flattenFieldList);
+			}
+		} else {
+			throw new Hinderance("Only can flatten FO or FOB field type, atomic fields cannot be flatten!");
+		}
+
+		return(flattenFieldList);
+	}
+
+	private static List<Field> FlattenInlineField(Connection aConn, Clasz<?> clasz2Inline, String aAccumFieldName, List<Field> aResult) throws Exception {
+		for (Field eachField : clasz2Inline.getInstantRecord().getFieldBox().values()) { 
+			if (eachField.getDbFieldType() == FieldType.OBJECT) {
+				String flatFieldName = Clasz.CreateDbFieldName(eachField.getDbFieldName(), aAccumFieldName); 
+				Clasz<?> member2Inline = ((FieldObject<?>) eachField).getObj();
+				FlattenInlineField(aConn, member2Inline, flatFieldName, aResult); // recursive to process the field, once inline all subsequent field in thie obj is inline
+			} else if (eachField.getDbFieldType() == FieldType.OBJECTBOX) { 
+				int cntr = 0;
+				for (Clasz<?> eachMember : ((FieldObjectBox<?>) eachField).getObjectMap().values()) {
+					String flatFieldName = Clasz.CreateDbFieldName(eachField.getDbFieldName(), cntr++ + "_" + aAccumFieldName); 
+					FlattenInlineField(aConn, eachMember, flatFieldName, aResult); // recursive to process the field, once inline all subsequent field in thie obj is inline
+				}
 			} else {
 				if (eachField.isSystemField() == false) {
-					String dbFieldName = Clasz.CreateDbFieldName(eachField.getFieldName(), aFlattedFieldName); // create field name prefix with the instant variable name
-					//aRoot.getField(dbFieldName).copyValue(aMaster.getField(eachField.getFieldName()));
-					aRoot.getField(dbFieldName).copyValue(eachField);
+					String dbFieldName = Clasz.CreateDbFieldName(eachField.getDbFieldName(), aAccumFieldName); // create field name prefix with the instant variable name
+					Field atomicField = Field.CreateField(eachField);
+					atomicField.setDbFieldName(dbFieldName);
+					aResult.add(atomicField);
 				}
 			}
 		}
+		return aResult;
 	}
 
-	public Long persist(Connection aConn, Clasz aObject, boolean isChildInsert) throws Exception {
-		CopyOnWriteArrayList<Clasz> avoidRecursive = new CopyOnWriteArrayList<>();
+	public Long persist(Connection aConn, Clasz<?> aObject, boolean isChildInsert) throws Exception {
+		CopyOnWriteArrayList<Clasz<?>> avoidRecursive = new CopyOnWriteArrayList<>();
 		Long result = this.persist(aConn, aObject, isChildInsert, avoidRecursive);
 		return(result);
 	}
 
-	public static boolean AlreadyPersist(List<Clasz> aAvoidRecursive, Clasz aObject) throws Exception {
+	public static boolean AlreadyPersist(List<Clasz<?>> aAvoidRecursive, Clasz<?> aObject) throws Exception {
 		boolean result = false;	
-		for(Clasz eachClasz : aAvoidRecursive) {
+		for(Clasz<?> eachClasz : aAvoidRecursive) {
 			if (eachClasz.getObjectId().equals(aObject.getObjectId()) && eachClasz.getClaszName().equals(aObject.getClaszName())) {
 				result = true;
 				break;
@@ -942,7 +920,7 @@ public class ObjectBase extends Database {
 
 	/**
 	 * When an object persistCommit is call, the system will determine if the object to
- persistCommit is an object from the database or a newly created object. If its a
+	 * persistCommit is an object from the database or a newly created object. If its a
 	 * newly created object, it is inserted, if its an existing object from the
 	 * database, it is updated. 
 	 * 
@@ -959,7 +937,7 @@ public class ObjectBase extends Database {
 	 * @param isChildInsert - use to track the number of child this parent object has
 	 * @throws Exception 
 	 */
-	private Long persist(Connection aConn, Clasz aObject, boolean isChildInsert, CopyOnWriteArrayList<Clasz> aAvoidRecursive) throws Exception {
+	private Long persist(Connection aConn, Clasz<?> aObject, boolean isChildInsert, CopyOnWriteArrayList<Clasz<?>> aAvoidRecursive) throws Exception {
 		try {
 			if (aObject.getClaszName().equals("Clasz")) {
 				return(aObject.getObjectId());
@@ -986,51 +964,43 @@ public class ObjectBase extends Database {
 							aObject.getFieldInt(aObject.createChildCountColName()).setModified(false);
 						}
 			
-						tree2Inline(aObject, aConn); // flatten and set the value inline object fields before the Insert
+						ObjectBase.Tree2Inline(aObject, aConn); // flatten and set the value inline object fields before the Insert
 						aObject.insert(aConn);
 						childInserted = true;
 			
-						for (Field eachField : aObject.getRecord().getFieldBox().values()) { // now update/insert all member variable
-							if (eachField.getFieldType() == FieldType.OBJECT) { // if field is of object type, recusive the persistCommit method
+						for (Field eachField : aObject.getInstantRecord().getFieldBox().values()) { // now update/insert all member variable
+							if (eachField.getDbFieldType() == FieldType.OBJECT) { // if field is of object type, recusive the persistCommit method
 								if (eachField.isInline() == false) {
-									Clasz memberObj = (Clasz)((FieldObject) eachField).getObj();
+									Clasz<?> memberObj = (Clasz<?>)((FieldObject<?>) eachField).getObj();
 									if (memberObj != null) {
 										if (memberObj.getClaszName().equals("Clasz") == false) {
-											CopyOnWriteArrayList<Clasz> avoidRecursive = (CopyOnWriteArrayList<Clasz>) aAvoidRecursive.clone();
+											//CopyOnWriteArrayList<Clasz> avoidRecursive = (CopyOnWriteArrayList<Clasz>) aAvoidRecursive.clone();
+											CopyOnWriteArrayList<Clasz<?>> avoidRecursive = new CopyOnWriteArrayList<>(aAvoidRecursive);
 											this.persist(aConn, memberObj, false, avoidRecursive);
-											this.updateMemberOf(aConn, aObject, (FieldObject) eachField); 
-											/*
-											if (eachField.isPolymorphic()) {
-												UpdatePolymorphic(aConn, aObject, (FieldObject) eachField);
-											}
-											*/
+											this.updateMemberOf(aConn, aObject, (FieldObject<?>) eachField); 
 										}
 									}
 								} else {
 									// inline object field, do nothing as would have been inserted by aObject.insert above
 								}
-							} else if (eachField.getFieldType() == FieldType.OBJECTBOX) { 
+							//} else if (eachField.getFieldType() == FieldType.OBJECTBOX) { 
+							} else if (eachField instanceof FieldObjectBox) { 
 								if (eachField.isInline() == true) { 
-									App.logEror(this, "FieldObjectBox cannot be inline, ignoring it, class: " + aObject.getClass().getSimpleName() + ", field: " + eachField.getFieldName());
+									App.logEror(this, "FieldObjectBox cannot be inline, ignoring it, class: " + aObject.getClass().getSimpleName() + ", field: " + eachField.getCamelCaseName());
 								}
 
-								if (((FieldClasz) eachField).getFetchStatus() == FetchStatus.SOF && ((FieldObjectBox )eachField).getTotalMember() == 0) {
+								if (((FieldClasz) eachField).getFetchStatus() == FetchStatus.SOF && ((FieldObjectBox<?> )eachField).getTotalMemberInList() == 0) {
 									continue; // ignore field object box that was never populated
 								}
 	
-								FieldObjectBox memberObj = (FieldObjectBox) eachField;
-								this.updateBoxMember(aConn, aObject, memberObj, aAvoidRecursive); 
-								/*
-								if (memberObj.getMetaObj().getClaszName().equals("Clasz") == false) {
-									this.updateBoxMember(aConn, aObject, memberObj, aAvoidRecursive, null); 
-								}
-								*/
+								FieldObjectBox<?> memberFob = (FieldObjectBox<?>) eachField;
+								this.updateBoxMember(aConn, aObject, memberFob, aAvoidRecursive); 
 							}
 						}
 					}
 			
 					if (ObjectBase.ParentIsNotAtClaszYet(aObject)) {
-						Clasz parentObject = aObject.getParentObjectByContext(); // get the parent object of the class to be inserted 
+						Clasz<?> parentObject = aObject.getParentObjectByContext(); // get the parent object of the class to be inserted 
 						if (parentObject != null ) { // null means is not at Clasz yet bcos it has inheritance parent class but no parent object is set, proabably because it has inherited an abstract class
 							this.persist(aConn, parentObject, childInserted, aAvoidRecursive); // recursively call Insert, now is to Insert the parent object
 							if (childInserted) {
@@ -1045,56 +1015,43 @@ public class ObjectBase extends Database {
 				try {
 					aObject.validateBeforePersist(aConn);
 					aObject.getFieldInt(aObject.createChildCountColName()).setModified(false); // don't touch the child count field
-					tree2Inline(aObject, aConn); // flatten and set the values in the inline object fields before the update 
+					ObjectBase.Tree2Inline(aObject, aConn); // flatten and set the values in the inline object fields before the update 
 					if (aObject.onlyMyselfIsModified()) {  // will only update if modified
 						aObject.update(aConn);
 					}
 		
-					for (Field eachField : aObject.getRecord().getFieldBox().values()) { // now update/insert all member variable
-						if (eachField.getFieldType() == FieldType.OBJECT) { // if field is of object type, recusive the persistCommit method
+					for (Field eachField : aObject.getInstantRecord().getFieldBox().values()) { // now update/insert all member variable
+						if (eachField.getDbFieldType() == FieldType.OBJECT) { // if field is of object type, recusive the persistCommit method
 							if (eachField.isInline() == false) {
-								Clasz memberObj = (Clasz)((FieldObject) eachField).getObj();
+								Clasz<?> memberObj = (Clasz<?>)((FieldObject<?>) eachField).getObj();
 								if (memberObj == null && eachField.isModified()) {
-									this.updateMemberOf(aConn, aObject, (FieldObject) eachField); 
-									/*
-									if (eachField.isPolymorphic()) {
-										UpdatePolymorphic(aConn, aObject, (FieldObject) eachField);
-									}
-									*/
+									this.updateMemberOf(aConn, aObject, (FieldObject<?>) eachField); 
 								} else if (memberObj != null && memberObj.getClaszName().equals("Clasz") == false) {
-									CopyOnWriteArrayList<Clasz> avoidRecursive = (CopyOnWriteArrayList<Clasz>) aAvoidRecursive.clone();
+									//CopyOnWriteArrayList<Clasz> avoidRecursive = (CopyOnWriteArrayList<Clasz>) aAvoidRecursive.clone();
+									CopyOnWriteArrayList<Clasz<?>> avoidRecursive = new CopyOnWriteArrayList<>(aAvoidRecursive);
 									this.persist(aConn, memberObj, false, avoidRecursive);
-									this.updateMemberOf(aConn, aObject, (FieldObject) eachField); 
-									/*
-									if (eachField.isPolymorphic()) {
-										UpdatePolymorphic(aConn, aObject, (FieldObject) eachField);
-									}
-									*/
+									this.updateMemberOf(aConn, aObject, (FieldObject<?>) eachField); 
 								}
 							} else { 
 								// inline object field, do nothing, how is inline persist? but its working
 							}
-						} else if (eachField.getFieldType() == FieldType.OBJECTBOX) { 
+						//} else if (eachField.getFieldType() == FieldType.OBJECTBOX) { 
+						} else if (eachField instanceof FieldObjectBox) { 
 							if (eachField.isInline() == true) { 
-								App.logEror(this, "FieldObjectBox cannot be inline, ignoring it, class: " + aObject.getClass().getSimpleName() + ", field: " + eachField.getFieldName());
+								App.logEror(this, "FieldObjectBox cannot be inline, ignoring it, class: " + aObject.getClass().getSimpleName() + ", field: " + eachField.getCamelCaseName());
 							}
 
-							if (((FieldClasz) eachField).getFetchStatus() == FetchStatus.SOF && ((FieldObjectBox )eachField).getTotalMember() == 0) {
+							if (((FieldClasz) eachField).getFetchStatus() == FetchStatus.SOF && ((FieldObjectBox<?>) eachField).getTotalMemberInList() == 0) {
 								continue; // ignore field object box that was never populated
 							}
 	
-							FieldObjectBox memberObj = (FieldObjectBox) eachField;
-							this.updateBoxMember(aConn, aObject, (FieldObjectBox) eachField, aAvoidRecursive); 
-							/*
-							if (memberObj.getMetaObj().getClaszName().equals("Clasz") == false) {
-								this.updateBoxMember(aConn, aObject, (FieldObjectBox) eachField, aAvoidRecursive); 
-							}
-							*/
+							FieldObjectBox<?> memberFob = (FieldObjectBox<?>) eachField;
+							this.updateBoxMember(aConn, aObject, memberFob, aAvoidRecursive); 
 						}
 					}
 		
 					if (ObjectBase.ParentIsNotAtClaszYet(aObject)) {
-						Clasz parentObject = aObject.getParentObjectByContext(); // get the parent object of the class to be updated
+						Clasz<?> parentObject = aObject.getParentObjectByContext(); // get the parent object of the class to be updated
 						if (parentObject != null ) { // null means is not at Clasz yet bcos it has inheritance parent class but no parent object is set, proabably because it has inherited an abstract class
 							this.persist(aConn, parentObject, false, aAvoidRecursive); // recursively call Insert, now is to Insert the parent object
 						}
@@ -1125,40 +1082,46 @@ public class ObjectBase extends Database {
 	 * @return
 	 * @throws Exception 
 	 */
-	public static Clasz FetchObject(Connection aConn, Clasz aCriteria) throws Exception {
-		Clasz result = Clasz.Fetch(aConn, aCriteria);
-		return(result);
+	public static Clasz<?> FetchObject(Connection aConn, Clasz<?> aCriteria) throws Exception {
+		Clasz<?> result = Clasz.Fetch(aConn, aCriteria);
+		return result;
 	}
 
-	public Clasz fetchObject(Clasz aCriteria) throws Exception {
+	public Clasz<?> fetchObject(Clasz<?> aCriteria) throws Exception {
 		Connection conn = null;
 		try {
 			conn = this.connPool.getConnection();
-			Clasz result = Clasz.Fetch(conn, aCriteria);
+			Clasz<?> result = Clasz.Fetch(conn, aCriteria);
 			return(result);
 		} finally {
 			if (conn != null) this.connPool.freeConnection(conn);
 		}
 	}
 
-	public static Clasz FetchObject(Connection aConn, Class aClass, Long aObjId) throws Exception {
-		Clasz result = Clasz.Fetch(aConn, aClass, aObjId);
-		return(result);
+	public static Clasz<?> FetchObjectFreeType(Connection aConn, Class<?> aClass, Long aObjId) throws Exception {
+		// return FetchObject(aConn, aClass, aObjId);
+		Clasz<?> result = Clasz.FetchFreeType(aConn, aClass, aObjId);
+		return result;
 	}
 
-	public Clasz fetchObject(Class aClass, Long aObjId) throws Exception {
+	public static <Ty extends Clasz<?>> Ty FetchObject(Connection aConn, Class<Ty> aClass, Long aObjId) throws Exception {
+		Ty result = Clasz.Fetch(aConn, aClass, aObjId);
+		return result;
+	}
+
+	public <Ty extends Clasz<?>> Ty fetchObject(Class<Ty> aClass, Long aObjId) throws Exception {
 		Connection conn = null;
 		try {
 			conn = this.connPool.getConnection();
-			Clasz result = Clasz.Fetch(this, conn, aClass, aObjId);
-			return(result);
+			Ty result = Clasz.Fetch(conn, aClass, aObjId);
+			return result;
 		} finally {
 			if (conn != null) this.connPool.freeConnection(conn);
 		}
 		
 	}
 
-	public static ResultSet FetchIndexKey(Connection aConn, Class aClass, PreparedStatement aStmt, String aIndexName, String aWhereClause, String aOrderClause) throws Exception {
+	public static ResultSet FetchIndexKey(Connection aConn, Class<?> aClass, PreparedStatement aStmt, String aIndexName, String aWhereClause, String aOrderClause) throws Exception {
 		ResultSet result = null;
 		if (Clasz.class.isAssignableFrom(aClass)) {
 			String pkName = Clasz.CreatePkColName(aClass);
@@ -1177,7 +1140,7 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public ResultSet fetchAllByChrono(Class aClass, PreparedStatement aStmt) throws Exception {
+	public ResultSet fetchAllByChrono(Class<?> aClass, PreparedStatement aStmt) throws Exception {
 		ResultSet result = null;
 		if (Clasz.class.isAssignableFrom(aClass)) {
 			Connection conn = null;
@@ -1196,7 +1159,7 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public static ResultSet FetchAllByChrono(Connection aConn, Class aClass, PreparedStatement aStmt) throws Exception {
+	public static ResultSet FetchAllByChrono(Connection aConn, Class<?> aClass, PreparedStatement aStmt) throws Exception {
 		ResultSet result = null;
 		if (Clasz.class.isAssignableFrom(aClass)) {
 			try {
@@ -1212,11 +1175,12 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public Clasz fetchNext(Class aClass, ResultSet aRset) throws Exception {
-		Clasz result = null;
+	public Clasz<?> fetchNext(Connection aConn, Class<?> aClass, ResultSet aRset) throws Exception {
+		Clasz<?> result = null;
 		if (Clasz.class.isAssignableFrom(aClass)) {
 			if (aRset.next()) {
-				Clasz objCriteria = this.createObject(aClass);
+				//Clasz objCriteria = this.createObject(aClass);
+				Clasz<?> objCriteria = this.createClasz(aConn, aClass);
 				objCriteria.setObjectId(aRset.getLong(Clasz.CreatePkColName(aClass)));
 				result = this.fetchObject(objCriteria);
 				if (result == null) {
@@ -1226,14 +1190,15 @@ public class ObjectBase extends Database {
 		} else {
 			throw new Hinderance("Cannot fetch the next object from class not inherited from Clasz for: '" + aClass.getSimpleName() + "'");
 		}
-		return(result);
+		return result;
 	}
 
-	public static Clasz FetchNext(Connection aConn, Class aClass, ResultSet aRset) throws Exception {
-		Clasz result = null;
+	public static Clasz<?> FetchNext(Connection aConn, Class<?> aClass, ResultSet aRset) throws Exception {
+		Clasz<?> result = null;
 		if (Clasz.class.isAssignableFrom(aClass)) {
 			if (aRset.next()) {
-				Clasz objCriteria = ObjectBase.CreateObject(aConn, aClass);
+				//Clasz objCriteria = ObjectBase.CreateObject(aConn, aClass);
+				Clasz<?> objCriteria = ObjectBase.CreateClaszFreeType(aConn, aClass);
 				objCriteria.setObjectId(aRset.getLong(Clasz.CreatePkColName(aClass)));
 				result = ObjectBase.FetchObject(aConn, objCriteria);
 				if (result == null) {
@@ -1246,54 +1211,32 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public static String GetPolymorphicMemberTableName(Connection aConn, FieldObject aMemberField, FieldObjectBox aMemberBoxField) throws Exception {
+	public static String GetIvPolymorphicTableName(Connection aConn, FieldObject<?> aMemberField) throws Exception {
 		String memberTableName;
-		Class memberClass;
-		boolean isMemberField = true;
 		Long memberOid = aMemberField.getObj().getObjectId();
-		if (aMemberBoxField != null) {
-			isMemberField = false;
-		}
-		if (isMemberField) {
-			memberClass = aMemberField.getObjectClass();
-		} else {
-			if (aMemberBoxField != null) {
-				memberClass = aMemberBoxField.getMemberClass();
-			} else {
-				throw new Hinderance("Wrong usaage of GetPolymorphicMemberTableName method, both FO and FOB is null");
-			}
-		}
+		Class<?> memberClass = aMemberField.getObjectClass(aConn); 
 		if (memberOid != null && memberOid != Clasz.NOT_INITIALIZE_OBJECT_ID) {  
 			// with oid, we can get the right polymorhic clasz for this object, its member table is from the leaf_class column, need to get this and get the member table name, do it later/needed 
-			Clasz parentObject = aMemberField.getMasterObject();
-			Class parentClass = parentObject.getClass();
+			Clasz<?> parentObject = aMemberField.getMasterObject();
+			Class<?> parentClass = parentObject.getClass();
 
 			String parentPkName = Clasz.CreatePkColName(parentClass);
 			Long parentPkValue = parentObject.getObjectId();
-			String memberName = aMemberField.getFieldName();
+			String memberName = aMemberField.getDbFieldName();
 
 			Field fieldParentPk = new FieldLong(parentPkName, parentPkValue);
 			Field fieldMemberPk = new FieldLong(memberName, memberOid);
 			Record whereRec = new Record();
-			whereRec.createField(fieldParentPk);
-			whereRec.createField(fieldMemberPk);
+			whereRec.createField(aConn, fieldParentPk);
+			whereRec.createField(aConn, fieldMemberPk);
 
 			String memberColName;
 			Record selectRec = new Record();
-			if (isMemberField) {
-				memberColName = Clasz.CreateLeafClassColName(memberName);
-				selectRec.createField(memberColName, FieldType.STRING, CLASS_NAME_LEN); // select the primary key of the child clszObject
-			} else {
-				memberColName = LEAF_CLASS;
-				selectRec.createField(LEAF_CLASS, FieldType.STRING, CLASS_NAME_LEN); // select the primary key of the child clszObject
-			}
-			
-			String ivTableName;
-			if (isMemberField) {
-				ivTableName = Clasz.GetIvTableName(parentClass);
-			} else {
-				ivTableName = Clasz.GetIwTableName(aMemberBoxField);
-			}
+
+			memberColName = Clasz.CreateLeafClassColName(memberName);
+			selectRec.createField(memberColName, FieldType.STRING, CLASS_NAME_LEN); // select the primary key of the child clszObject
+			String ivTableName = Clasz.GetIvTableName(parentClass);
+
 			Table ivTable = new Table(ivTableName);
 			if (ivTable.fetch(aConn, selectRec, whereRec) == 1) {
 				String memberClassName = selectRec.getField(memberColName).getValueStr();
@@ -1307,13 +1250,55 @@ public class ObjectBase extends Database {
 		return(memberTableName);
 	}
 
-	private static void GetJoinMemberClause(Connection aConn, Multimap<String, Record> aWhereBox, Class aParentClass, FieldObject aMemberField) throws Exception {
+	public static String GetIwPolymorphicTableName(Connection aConn, FieldObjectBox<?> aMemberBoxField, Clasz<?> aMemberClasz) throws Exception {
+		String memberTableName;
+		Long memberOid = aMemberClasz.getObjectId();
+		Class<?> memberClass = aMemberClasz.getClass();
+
+		if (memberOid != null && memberOid != Clasz.NOT_INITIALIZE_OBJECT_ID) {  
+			// with oid, we can get the right polymorhic clasz for this object, its member table is from the leaf_class column, need to get this and get the member table name, do it later/needed 
+			Clasz<?> parentObject = aMemberBoxField.getMasterObject();
+			Class<?> parentClass = parentObject.getClass();
+
+			String parentPkName = Clasz.CreatePkColName(parentClass);
+			Long parentPkValue = parentObject.getObjectId();
+			String memberName = aMemberBoxField.getDbFieldName();
+
+			Field fieldParentPk = new FieldLong(parentPkName, parentPkValue);
+			Field fieldMemberPk = new FieldLong(memberName, memberOid);
+			Record whereRec = new Record();
+			whereRec.createField(aConn, fieldParentPk);
+			whereRec.createField(aConn, fieldMemberPk);
+
+			String memberColName;
+			Record selectRec = new Record();
+			memberColName = LEAF_CLASS;
+			selectRec.createField(LEAF_CLASS, FieldType.STRING, CLASS_NAME_LEN); // select the primary key of the child clszObject
+
+			String iwTableName = Clasz.GetIwTableName(aMemberBoxField);
+			Table iwTable = new Table(iwTableName);
+			if (iwTable.fetch(aConn, selectRec, whereRec) == 1) {
+				String memberClassName = selectRec.getField(memberColName).getValueStr();
+				memberTableName = selectRec.getValueStr(Class.forName(memberClassName).getSimpleName());
+			} else {
+				throw new Hinderance("Missing or more then one member record, iw table: " + iwTableName + ", parent pk: " + parentPkName + ", value: " + parentPkValue + ", member field: " + memberName + ", value: " + memberOid);
+			}
+		} else {
+			memberTableName = Clasz.CreateTableName(memberClass); // user have to state if the search uses normal or polymorhic clasz 
+		}
+		return(memberTableName);
+	}
+
+	private static void GetJoinMemberClause(Connection aConn, Multimap<String, Record> aWhereBox, Class<?> aParentClass, FieldObject<?> aMemberField) throws Exception {
 		String ivTableName = Clasz.GetIvTableName(aParentClass);
 		Long memberOid = aMemberField.getObj().getObjectId();
 		if (memberOid != null && memberOid != Clasz.NOT_INITIALIZE_OBJECT_ID) { // if member object has object id, then will need to get the member join clause
 			Record linkIv2Member = new Record();
-			linkIv2Member.createField(aMemberField.getFieldName(), memberOid);
+			linkIv2Member.createField(aMemberField.getDbFieldName(), memberOid);
 			aWhereBox.put(ivTableName, linkIv2Member);
+		} else {
+			Record linkIv2Member = new Record();
+			aWhereBox.put(ivTableName, linkIv2Member); // need iv table in from clause, but link to empty record
 		}
 
 		// link iv table to master table
@@ -1326,67 +1311,137 @@ public class ObjectBase extends Database {
 
 		// link iv table to member table
 		Record whereRecLink = new Record();
-		whereRecLink.createField(aMemberField.getFieldName(), "");
+		whereRecLink.createField(aMemberField.getDbFieldName(), "");
 		String memberTableName;
 		if (aMemberField.isPolymorphic() == false) {
 			memberTableName = Clasz.CreateTableName(aMemberField.getObjectClass());
 		} else {
 			App.logWarn(ObjectBase.class, "Using polymorphic object field as search criteria, remember to use the right polymorphic type in your criteria");
-			memberTableName = GetPolymorphicMemberTableName(aConn, aMemberField, null);
+			memberTableName = GetIvPolymorphicTableName(aConn, aMemberField);
 		}
 		String memberPkName = Clasz.CreatePkColName(aMemberField.getObjectClass());
-		whereRecLink.getField(aMemberField.getFieldName()).setFormulaStr(ivTableName + "." + aMemberField.getFieldName() + " = " + memberTableName + "." + memberPkName);
+		whereRecLink.getField(aMemberField.getDbFieldName()).setFormulaStr(ivTableName + "." + aMemberField.getDbFieldName() + " = " + memberTableName + "." + memberPkName);
 		aWhereBox.put(memberTableName, whereRecLink);
 	}
 
-	public static void GetLeafSelectCriteria(Connection aConn, Clasz aCriteria, Multimap<String, Record> aWhereBox) throws Exception {
+	public static void GetLeafSelectCriteria(Connection aConn, Clasz<?> aCriteria, Multimap<String, Record> aWhereBox) throws Exception {
 		String accumFieldName = "";
-		Clasz highestParent2Link = GetHighestParent2Link(aConn, aCriteria);
+		Clasz<?> highestParent2Link = GetHighestParent2Link(aConn, aCriteria);
 		GetLeafSelectCriteria(aConn, aCriteria, aWhereBox, accumFieldName, highestParent2Link);
 	}
 
-	private static void GetLeafSelectCriteria(Connection aConn, Clasz aCriteria, Multimap<String, Record> aWhereBox, String aAccumFieldName, Clasz aHighestParent2Link) throws Exception {
+	private static void SetWhereRecField(Connection aConn, Record aWhereRec, Field aCriteriaField) throws Exception {
+		if (aCriteriaField.getFormulaStr().isEmpty()) {
+			aWhereRec.createField(aConn, aCriteriaField);
+			aWhereRec.copyValue(aConn, aCriteriaField);
+		} else {
+			Field newField = aWhereRec.createField(aConn, aCriteriaField);
+			aWhereRec.copyValue(aConn, aCriteriaField);
+			newField.setFormulaStr(aCriteriaField.getFormulaStr());
+		}
+	}
+
+	/*
+	private static List<Object> LinkFob2Parent(Connection aConn, FieldObjectBox<?> aFobMember) throws Exception {
+		Clasz aMemberParent = aFobMember.getMasterObject();
+		String iwBoxTableName = Clasz.GetIwTableName(aFobMember);
+		Record linkIwBox2Member = new Record();
+		linkIwBox2Member.createField(aFobMember.getFieldName(), "");
+		String parentTableName;
+		if (aFobMember.isPolymorphic() == false) {
+			parentTableName = Clasz.CreateTableName(aMemberParent.getClass());
+		} else {
+			App.logWarn(ObjectBase.class, "Using polymorphic FOB as search criteria, remember to use the right polymorphic type in your criteria");
+			parentTableName = GetIwPolymorphicTableName(aConn, aFobMember, aMemberParent);
+		}
+		String parentPkName = Clasz.CreatePkColName(aMemberParent.getClass());
+		linkIwBox2Member.getField(aFobMember.getFieldName()).setFormulaStr(iwBoxTableName + "." + parentPkName + " = " + parentTableName + "." + parentPkName);
+
+		List<Object> result = new CopyOnWriteArrayList<>();
+		result.add(parentTableName);
+		result.add(linkIwBox2Member);
+		return result;
+	}
+	*/
+
+	// link fob to member only i.e. iw_ table links to member, doesn't link to its parent
+	private static List<Object> LinkFob2Member(Connection aConn, FieldObjectBox<?> aFobMember) throws Exception {
+		Clasz<?> aMemberCriteria = aFobMember.getMetaObj();
+		String iwBoxTableName = Clasz.GetIwTableName(aFobMember);
+		Record linkIwBox2Member = new Record();
+		linkIwBox2Member.createField(aFobMember.getDbFieldName(), "");
+		String memberTableName;
+		if (aFobMember.isPolymorphic() == false) {
+			memberTableName = Clasz.CreateTableName(aMemberCriteria.getClass());
+		} else {
+			App.logWarn(ObjectBase.class, "Using polymorphic FOB as search criteria, remember to use the right polymorphic type in your criteria");
+			memberTableName = GetIwPolymorphicTableName(aConn, aFobMember, aMemberCriteria);
+		}
+		String memberPkName = Clasz.CreatePkColName(aMemberCriteria.getClass());
+		linkIwBox2Member.getField(aFobMember.getDbFieldName()).setFormulaStr(iwBoxTableName + "." + aFobMember.getDbFieldName() + " = " + memberTableName + "." + memberPkName);
+
+		List<Object> result = new CopyOnWriteArrayList<>();
+		result.add(memberTableName);
+		result.add(linkIwBox2Member);
+		return result;
+	}
+
+	private static void GetLeafSelectCriteria(Connection aConn, Clasz<?> aCriteria, Multimap<String, Record> aWhereBox, String aAccumFieldName, Clasz<?> aHighestParent2Link) throws Exception {
 		Record whereRec = new Record();
-		for (Field eachField : aCriteria.getRecord().getFieldBox().values()) { // for each populated field, build up the sql where clause
+		String whereTableName = aCriteria.getTableName();
+		for (Field eachField : aCriteria.getInstantRecord().getFieldBox().values()) { // for each populated field, build up the sql where clause
 			if (eachField.isModified()) {
 				if (eachField.isInline() == false) {
-					if (eachField.getFieldType() == FieldType.OBJECT) { // if field is of object type, traverse it
-						GetJoinMemberClause(aConn, aWhereBox, aCriteria.getClass(), (FieldObject) eachField);
-						Clasz fieldObject = ((FieldObject) eachField).getObj(); // convert table type to Clasz type
+					if (eachField.getDbFieldType() == FieldType.OBJECT) { // if field is of object type, traverse it
+						GetJoinMemberClause(aConn, aWhereBox, aCriteria.getClass(), (FieldObject<?>) eachField);
+						Clasz<?> fieldObject = ((FieldObject<?>) eachField).getObj(); // convert table type to Clasz type
 						if (fieldObject.getClaszName().equals("Clasz") == false) {
 							GetLeafSelectCriteria(aConn, fieldObject, aWhereBox);
 						}
-					} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
-						// kiv, currently not supported yet
+					} else if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
+						Multimap<String, Record> fobWhereBox = Multimaps.synchronizedListMultimap(ArrayListMultimap.create());
+						FieldObjectBox<?> fobField = (FieldObjectBox<?>) eachField;
+						for(Clasz<?> eachFobCriteria: fobField.getObjectMap().values()) {
+							GetLeafSelectCriteria(aConn, eachFobCriteria, fobWhereBox, aAccumFieldName, aHighestParent2Link); 
+						}
+
+						int cntrRec = 0;
+						Record whereRecFob = new Record();
+						String tableNameFob = "";
+						for (Entry<String, Record> entry : fobWhereBox.entries()) {
+							tableNameFob = entry.getKey();
+							String tableName = tableNameFob + "_" + cntrRec++;
+							Record eachRec = entry.getValue();
+							whereRecFob.createField(tableName, eachRec);
+						}
+						if (whereRecFob.totalField() > 0) {
+							aWhereBox.put(tableNameFob, whereRecFob);
+						}
 					} else {
-						whereRec.createField(eachField);
-						whereRec.copyValue(eachField);
-						aWhereBox.put(aCriteria.getTableName(), whereRec);
+						SetWhereRecField(aConn, whereRec, eachField);
 					}
 				} else { // handle inline field
-					if (eachField.getFieldType() == FieldType.OBJECT) { // if field is of inline object type, traverse it
-						FieldObject inlineField = (FieldObject) eachField;
-						Clasz memberObj = inlineField.getObj();
+					if (eachField.getDbFieldType() == FieldType.OBJECT) { // if field is of inline object type, traverse it
+						FieldObject<?> inlineField = (FieldObject<?>) eachField;
+						Clasz<?> memberObj = inlineField.getObj();
 						if (memberObj != null) {
-							for (Field eachInlineField : memberObj.getRecord().getFieldBox().values()) {
-								if (eachInlineField.getFieldType() == FieldType.OBJECT || eachInlineField.getFieldType() == FieldType.OBJECTBOX) { // TODO handle objectbox type
-									String dbFieldName = Clasz.CreateDbFieldName(eachInlineField.getFieldName(), aAccumFieldName); // create the field name of the inline field from its member name and its field name
+							for (Field eachInlineField : memberObj.getInstantRecord().getFieldBox().values()) {
+								if (eachInlineField.getDbFieldType() == FieldType.OBJECT || eachInlineField.getDbFieldType() == FieldType.OBJECTBOX) { // TODO handle objectbox type
+									String dbFieldName = Clasz.CreateDbFieldName(eachInlineField.getDbFieldName(), aAccumFieldName); // create the field name of the inline field from its member name and its field name
 									GetLeafSelectCriteria(aConn, aCriteria, aWhereBox, dbFieldName, aHighestParent2Link); // recursive to accumulate inline field name
 								} else {
 									if (eachInlineField.isSystemField() == false) {
-										Clasz masterClasz = eachField.getMasterObject();
-										String inlineFieldName = Clasz.CreateDbFieldName(eachInlineField.getFieldName(), aAccumFieldName);
+										Clasz<?> masterClasz = eachField.getMasterObject();
+										String inlineFieldName = Clasz.CreateDbFieldName(eachInlineField.getDbFieldName(), aAccumFieldName);
 										Field fieldRec = masterClasz.getField(inlineFieldName);
-										whereRec.createField(fieldRec);
-										whereRec.copyValue(fieldRec);
-										aWhereBox.put(aCriteria.getTableName(), whereRec);
+										SetWhereRecField(aConn, whereRec, fieldRec);
 									} else {
 										// ignore system field
 									}
 								}
 							}
 						}
-					} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
+					} else if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
 						// kiv, currently not supported yet
 					} else {
 						throw new Hinderance("Internal application error, inline field can only be of FieldObject or FieldObjectBox type!");
@@ -1394,9 +1449,12 @@ public class ObjectBase extends Database {
 				}
 			}
 		}
+		if (whereRec.totalField() > 0) {
+			aWhereBox.put(whereTableName, whereRec);
+		}
 
 		if (ObjectBase.ParentIsNotAtClaszYet(aCriteria)) { 
-			Clasz parentObject = aCriteria.getParentObjectByContext();
+			Clasz<?> parentObject = aCriteria.getParentObjectByContext();
 			if (parentObject != null && parentObject.getClass().equals(Clasz.class) == false) { // no parent clszObject because its an abstract class and no inherited normal class
 				if (aHighestParent2Link.getClass().equals(parentObject.getClass()) == false) { // if haven't reach the highest parent that have modified field, recurse
 					GetInheritanceLink(aConn, aWhereBox, parentObject, aCriteria);
@@ -1406,17 +1464,17 @@ public class ObjectBase extends Database {
 		}
 	}
 
-	public static Clasz GetHighestParent2Link(Connection aConn, Clasz aLeafClasz) throws Exception {
-		Clasz highestParent2Link = aLeafClasz;
+	public static Clasz<?> GetHighestParent2Link(Connection aConn, Clasz<?> aLeafClasz) throws Exception {
+		Clasz<?> highestParent2Link = aLeafClasz;
 		GetHighestParent2Link(aConn, aLeafClasz, highestParent2Link);
-		return(highestParent2Link);
+		return highestParent2Link;
 	}
 
-	private static void GetHighestParent2Link(Connection aConn, Clasz aLeafClasz, Clasz aHighestParent2Link) throws Exception {
+	private static void GetHighestParent2Link(Connection aConn, Clasz<?> aLeafClasz, Clasz<?> aHighestParent2Link) throws Exception {
 		if (ObjectBase.ParentIsNotAtClaszYet(aLeafClasz)) { 
-			Clasz parentObject = aLeafClasz.getParentObjectByContext();
+			Clasz<?> parentObject = aLeafClasz.getParentObjectByContext();
 			if (parentObject != null && parentObject.getClass().equals(Clasz.class) == false) { // no parent clszObject because its an abstract class and no inherited normal class
-				for (Field eachField : aLeafClasz.getRecord().getFieldBox().values()) { 
+				for (Field eachField : aLeafClasz.getInstantRecord().getFieldBox().values()) { 
 					if (eachField.isModified()) {
 						aHighestParent2Link = parentObject;
 						break;
@@ -1427,7 +1485,7 @@ public class ObjectBase extends Database {
 		}
 	}
 
-	public static void GetInheritanceLink(Connection aConn, Multimap<String, Record> aWhereBox, Clasz aParentObject, Clasz aChildObject) throws Exception {
+	public static void GetInheritanceLink(Connection aConn, Multimap<String, Record> aWhereBox, Clasz<?> aParentObject, Clasz<?> aChildObject) throws Exception {
 		String ihTableName = Clasz.GetIhTableName(aChildObject.getClass());
 
 		Record linkParentRec = new Record();
@@ -1446,30 +1504,36 @@ public class ObjectBase extends Database {
 		aWhereBox.put(ihTableName, linkChildRec);
 	}
 
-	public static void GetMemberBoxByMemberCriteria(Connection aConn, FieldObjectBox aFobMember, Clasz aMemberCriteria, Multimap<String, Record> aWhereBox) throws Exception {
+	public static void GetMemberBoxByMemberCriteria(Connection aConn, FieldObjectBox<?> aFobMember, Clasz<?> aMemberCriteria, Multimap<String, Record> aWhereBox) throws Exception {
 		if (aFobMember.isInline() == false) {
-			String ivBoxTableName = Clasz.GetIwTableName(aFobMember);
-			Record linkIvBox2Member = new Record();
-			linkIvBox2Member.createField(aFobMember.getFieldName(), "");
+			/*
+			String iwBoxTableName = Clasz.GetIwTableName(aFobMember);
+			Record linkIwBox2Member = new Record();
+			linkIwBox2Member.createField(aFobMember.getFieldName(), "");
 			String memberTableName;
 			if (aFobMember.isPolymorphic() == false) {
 				memberTableName = Clasz.CreateTableName(aMemberCriteria.getClass());
 			} else {
 				App.logWarn(ObjectBase.class, "Using polymorphic FOB as search criteria, remember to use the right polymorphic type in your criteria");
-				memberTableName = GetPolymorphicMemberTableName(aConn, null, aFobMember);
+				memberTableName = GetIwPolymorphicTableName(aConn, aFobMember, aMemberCriteria);
 			}
 			String memberPkName = Clasz.CreatePkColName(aMemberCriteria.getClass());
-			linkIvBox2Member.getField(aFobMember.getFieldName()).setFormulaStr(ivBoxTableName + "." + aFobMember.getFieldName() + " = " + memberTableName + "." + memberPkName);
-			aWhereBox.put(memberTableName, linkIvBox2Member);
-			GetLeafSelectCriteria(aConn, aMemberCriteria, aWhereBox); // link iv table to it's member
+			linkIwBox2Member.getField(aFobMember.getFieldName()).setFormulaStr(iwBoxTableName + "." + aFobMember.getFieldName() + " = " + memberTableName + "." + memberPkName);
+			*/
+			List<Object> linkFob2Member = LinkFob2Member(aConn, aFobMember);
+			String memberTableName = (String) linkFob2Member.get(0);
+			Record linkIwBox2Member = (Record) linkFob2Member.get(1);
+
+			aWhereBox.put(memberTableName, linkIwBox2Member);
+			GetLeafSelectCriteria(aConn, aMemberCriteria, aWhereBox); // link iw table to it's member
 		} else {
 			App.logWarn(ObjectBase.class, "Using inline FOB field as search criteria, nothing wrong but please check");
 			Record linkIvBox2Parent = new Record();
-			Class parentClass = aFobMember.getMasterClass();
+			Class<?> parentClass = aFobMember.getMasterClass();
 			String parentPkName = Clasz.CreatePkColName(parentClass);
 			String parentTableName = Clasz.CreateTableName(parentClass);
 			String ivBoxTableName = Clasz.GetIwTableName(aFobMember);
-			linkIvBox2Parent.getField(aFobMember.getFieldName()).setFormulaStr(ivBoxTableName + "." + parentPkName + " = " + parentTableName + "." + parentPkName);
+			linkIvBox2Parent.getField(aFobMember.getDbFieldName()).setFormulaStr(ivBoxTableName + "." + parentPkName + " = " + parentTableName + "." + parentPkName);
 			aWhereBox.put(parentTableName, linkIvBox2Parent);
 			GetLeafSelectCriteria(aConn, aMemberCriteria, aWhereBox); // with inline field, we link it to it's own parent table
 		}
@@ -1502,7 +1566,7 @@ public class ObjectBase extends Database {
 	 * @throws Exception 
 	 * 
 	 */
-	public static void getInheritanceWhere(Clasz aObject, StringBuffer strInherit, StringBuffer strTable) throws Exception {
+	public static void getInheritanceWhere(Clasz<?> aObject, StringBuffer strInherit, StringBuffer strTable) throws Exception {
 		if (strTable.toString().isEmpty() == false) {
 			strTable.append(", ");
 		}
@@ -1546,10 +1610,10 @@ public class ObjectBase extends Database {
 	* @param strTable
 	* @throws Exception 
 	*/
-	public static void getMemberOfWhere(Clasz aMaster, StringBuffer strInherit, StringBuffer strTable) throws Exception {
-		for (Field eachField : aMaster.getRecord().getFieldBox().values()) {
-			if (eachField.isInline() == false && eachField.getFieldType() == FieldType.OBJECT) { 
-				Clasz memberObj = ((FieldObject) eachField).getValueObj();
+	public static void getMemberOfWhere(Connection aConn, Clasz<?> aMaster, StringBuffer strInherit, StringBuffer strTable) throws Exception {
+		for (Field eachField : aMaster.getInstantRecord().getFieldBox().values()) {
+			if (eachField.isInline() == false && eachField.getDbFieldType() == FieldType.OBJECT) { 
+				Clasz<?> memberObj = ((FieldObject<?>) eachField).getValueObj(aConn);
 
 				if (strTable.toString().isEmpty() == false) {
 					strTable.append(", ");
@@ -1560,8 +1624,8 @@ public class ObjectBase extends Database {
 					strInherit.append(" and ");
 				}
 				strInherit.append(memberObj.getTableName() + "." + memberObj.getPkName());
-				strInherit.append(" = (select " + eachField.getFieldName() + " from " + aMaster.getIvTableName() + " where " + aMaster.getTableName() + "." + aMaster.getPkName() + " = " + aMaster.getIvTableName() + "." + aMaster.getPkName() + ")");
-				getMemberOfWhere(memberObj, strInherit, strTable); // recursive call to flatten the object hierarchy into a single sql statement
+				strInherit.append(" = (select " + eachField.getDbFieldName() + " from " + aMaster.getIvTableName() + " where " + aMaster.getTableName() + "." + aMaster.getPkName() + " = " + aMaster.getIvTableName() + "." + aMaster.getPkName() + ")");
+				getMemberOfWhere(aConn, memberObj, strInherit, strTable); // recursive call to flatten the object hierarchy into a single sql statement
 			}
 		}
 	}
@@ -1577,7 +1641,7 @@ public class ObjectBase extends Database {
 	 * @param aObject
 	 * @return 
 	 */
-	public static boolean IsNotAtClaszYet(Clasz aObject) {
+	public static boolean IsNotAtClaszYet(Clasz<?> aObject) {
 		boolean result;
 		if (aObject == null || aObject.getClass() == Clasz.class) {
 			result = false;
@@ -1587,13 +1651,13 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public static boolean ParentIsNotAtClaszYet(Clasz aObject) {
+	public static boolean ParentIsNotAtClaszYet(Clasz<?> aObject) {
 		return(ParentIsNotAtClaszYet(aObject.getClass()));
 	}
 
-	public static boolean ParentIsNotAtClaszYet(Class aClass) {
+	public static boolean ParentIsNotAtClaszYet(Class<?> aClass) {
 		boolean result;
-		Class ParentClass = aClass.getSuperclass();
+		Class<?> ParentClass = aClass.getSuperclass();
 		if (ParentClass == null || ParentClass.equals(Clasz.class)) {
 			result = false;
 		} else {
@@ -1602,13 +1666,13 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public static boolean ParentIsNotAbstract(Clasz aObject) {
+	public static boolean ParentIsNotAbstract(Clasz<?> aObject) {
 		return(ParentIsNotAbstract(aObject.getClass()));
 	}
 
-	public static boolean ParentIsNotAbstract(Class aClass) {
+	public static boolean ParentIsNotAbstract(Class<?> aClass) {
 		boolean result;
-		Class ParentClass = aClass.getSuperclass();
+		Class<?> ParentClass = aClass.getSuperclass();
 		if (Modifier.isAbstract(ParentClass.getModifiers())) {
 			result = false;
 		} else {
@@ -1619,13 +1683,13 @@ public class ObjectBase extends Database {
 
 
 	/*
-	public static String CreateObjectIndex(Connection aConn, Clasz aClasz) throws Exception {
+	public static String CreateObjectIndex(Connection aConn, Clasz<?> aClasz) throws Exception {
 		String result = ObjectIndex.CreateObjectIndex(aConn, aClasz);
 		return(result);
 	}
 	*/
 
-	public String createFieldIndex(Clasz aClasz, String aFieldName) throws Exception {
+	public String createFieldIndex(Clasz<?> aClasz, String aFieldName) throws Exception {
 		Connection conn = this.connPool.getConnection();
 		try {
 			String result = ObjectIndex.createFieldIndex(conn, aClasz, aFieldName);
@@ -1637,19 +1701,19 @@ public class ObjectBase extends Database {
 		}		
 	}
 
-	public static boolean ObjectExist(Connection aConn, Clasz aObject) throws Exception {
+	public static boolean ObjectExist(Connection aConn, Clasz<?> aObject) throws Exception {
 		boolean result = false;
 		long count = ObjectCount(aConn, aObject, true);
 		if (count > 0) result = true;
 		return(result);
 	}
 
-	public static long ObjectCount(Connection aConn, Clasz aObject, boolean aCheckExistOnly) throws Exception {
+	public static long ObjectCount(Connection aConn, Clasz<?> aObject, boolean aCheckExistOnly) throws Exception {
 		//Map<String, Record> whereBox = new ConcurrentHashMap<>(); // each table name (string) and a record for the where fields (record)
 		Multimap<String, Record> whereBox = Multimaps.synchronizedListMultimap(ArrayListMultimap.create());
 		ObjectBase.GetLeafSelectCriteria(aConn, aObject, whereBox); 
 		StringBuffer strBuffer = new StringBuffer();
-		List<Field> aryWhere = Database.GetWhereClause(whereBox, strBuffer); // convert the where record into array list
+		List<Field> aryWhere = Database.GetWhereClause(aConn, whereBox, strBuffer); // convert the where record into array list
 		String sqlStr = "select * from " + Database.GetFromClause(aObject.getTableName(), whereBox);
 		sqlStr += " where " + strBuffer.toString();
 
@@ -1658,7 +1722,7 @@ public class ObjectBase extends Database {
 		ResultSet rs = null;
 		try {
 			stmt = aConn.prepareStatement(sqlStr);
-			Database.SetStmtValue(stmt, aryWhere);
+			Database.SetStmtValue(aConn, stmt, aryWhere);
 			rs = stmt.executeQuery();
 			while (rs.next()) {
 				aObject.setObjectId(rs.getLong(aObject.getPkName()));
@@ -1683,14 +1747,14 @@ public class ObjectBase extends Database {
 		return(cntrRec);
 	}
 
-	public static void LoadAllClasz(Connection aConn, Class aClass, CopyOnWriteArrayList<Clasz> aResultList) throws Exception {
+	public static void LoadAllClasz(Connection aConn, Class<?> aClass, CopyOnWriteArrayList<Clasz<?>> aResultList) throws Exception {
 		PreparedStatement stmt = null;
 		ResultSet rset = null;
-		Clasz objFetched;
+		Clasz<?> objFetched;
 		aResultList.clear();
 		try {
 			rset = ObjectBase.FetchAllByChrono(aConn, aClass, stmt);
-			while((objFetched = (Clasz) ObjectBase.FetchNext(aConn, aClass, rset)) != null) {
+			while((objFetched = (Clasz<?>) ObjectBase.FetchNext(aConn, aClass, rset)) != null) {
 				aResultList.add(objFetched);
 			}
 		} finally {
@@ -1703,7 +1767,7 @@ public class ObjectBase extends Database {
 		}
 	}
 
-	public static boolean Exist(Connection aConn, Clasz aCriteria) throws Exception {
+	public static boolean Exist(Connection aConn, Clasz<?> aCriteria) throws Exception {
 		boolean result = false;
 
 		// set the where record
@@ -1713,7 +1777,7 @@ public class ObjectBase extends Database {
 
 		// place in the where criteria into sql string
 		StringBuffer strBuffer = new StringBuffer();
-		List<Field> aryWhere = Database.GetWhereClause(whereBox, strBuffer); // convert the where record into array list
+		List<Field> aryWhere = Database.GetWhereClause(aConn, whereBox, strBuffer); // convert the where record into array list
 		String sqlStr = "select * from " + Database.GetFromClause(aCriteria.getTableName(), whereBox);
 		sqlStr += " where " + strBuffer.toString();
 
@@ -1721,7 +1785,7 @@ public class ObjectBase extends Database {
 		ResultSet rs = null;
 		try {
 			stmt = aConn.prepareStatement(sqlStr);
-			Database.SetStmtValue(stmt, aryWhere);
+			Database.SetStmtValue(aConn, stmt, aryWhere);
 			rs = stmt.executeQuery();
 			while (rs.next()) {
 				result = true;
@@ -1745,14 +1809,17 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public static FetchStatus FetchIfGotMember(Connection aConn, FieldObjectBox aFetchedBox, Clasz aMasterClasz, FieldObject aWantedMember, String aSortField, String aSortValue) throws Exception {
+	/*
+	private static FetchStatus FetchIfGotMember(Connection aConn, FieldObjectBox<?> aFetchedBox, Clasz<?> aMasterClasz, FieldObject<?> aWantedMember, String aSortField, String aSortValue) throws Exception {
 		FetchStatus fetchStatus = FetchIfGotMember(aConn, aFetchedBox, aMasterClasz, aWantedMember, 5, "next", SortOrder.DSC, aSortField, aSortValue);
 		return(fetchStatus);
 	}
+	*/
 
 	// Fetches objects in aMasterClasz that have member object aWantedMember
 	// This is refactor copy for FieldObjectBox.fetchMemberOfBoxObjectBySection
-	public static FetchStatus FetchIfGotMember(Connection aConn, FieldObjectBox fieldBox, Clasz aMasterClasz, FieldObject aWantedMember, int aPageSize, String aPageDirection, SortOrder aDisplayOrder, String aSortField, String aSortValue) throws Exception {
+	/*
+	private static FetchStatus FetchIfGotMember(Connection aConn, FieldObjectBox<?> fieldBox, Clasz<?> aMasterClasz, FieldObject<?> aWantedMember, int aPageSize, String aPageDirection, SortOrder aDisplayOrder, String aSortField, String aSortValue) throws Exception {
 		FetchStatus fetchStatus;
 		PreparedStatement stmt;
 		ResultSet rset;
@@ -1790,6 +1857,7 @@ public class ObjectBase extends Database {
 
 		return(fetchStatus);	
 	}
+	*/
 
 	public static void GetClauseForPageDirectionAndSort(Connection aConn, List<Object> aResult, String masterTableName, SortOrder aDisplayOrder, String aPageDirection, String aSortField, String aSortValue) throws Exception {
 		if (aDisplayOrder == SortOrder.DSC) {
@@ -1806,7 +1874,7 @@ public class ObjectBase extends Database {
 		masterTable.initMeta(aConn);
 		Field keyField = masterTable.getField(aSortField);
 		if (aSortValue == null || aSortValue.trim().isEmpty()) aSortValue = null;  // for empty or null value, there'll be no where range clause
-		if (keyField.getFieldType() == FieldType.STRING) {
+		if (keyField.getDbFieldType() == FieldType.STRING) {
 			if (aPageDirection.equals("next")) {
 				if (aSortValue != null) whereClause += "lower(" + aSortField + ") > lower('" + aSortValue + "')";
 				sortOrder = "asc";
@@ -1818,7 +1886,7 @@ public class ObjectBase extends Database {
 			} else if (aPageDirection.equals("last")) {
 				sortOrder = "desc";
 			}
-		} else if (keyField.getFieldType() == FieldType.DATETIME || keyField.getFieldType() == FieldType.DATE) {
+		} else if (keyField.getDbFieldType() == FieldType.DATETIME || keyField.getDbFieldType() == FieldType.DATE) {
 			if (aPageDirection.equals("next")) {
 				if (aSortValue != null) whereClause += aSortField + " > ?";
 				sortOrder = "asc";
@@ -1831,7 +1899,7 @@ public class ObjectBase extends Database {
 				sortOrder = "desc";
 			}
 		} else {
-			throw new Hinderance("The field: " + aSortField + ", type: " + keyField.getFieldType() + ", is not supported!");
+			throw new Hinderance("The field: " + aSortField + ", type: " + keyField.getDbFieldType() + ", is not supported!");
 		}
 
 		aResult.add(whereClause);
@@ -1841,7 +1909,7 @@ public class ObjectBase extends Database {
 
 	public static void SetSqlIfDateParameter(PreparedStatement stmt, Field keyField, String whereClause, String aSortValue) throws Exception {
 		if (aSortValue != null) {
-			if ((keyField.getFieldType() == FieldType.DATETIME || keyField.getFieldType() == FieldType.DATE) && whereClause.isEmpty() == false) {
+			if ((keyField.getDbFieldType() == FieldType.DATETIME || keyField.getDbFieldType() == FieldType.DATE) && whereClause.isEmpty() == false) {
 				java.sql.Timestamp dateValue;
 				Field fieldDt = (Field) keyField;
 				fieldDt.setValueStr(aSortValue);
@@ -1861,7 +1929,10 @@ public class ObjectBase extends Database {
 		}
 	}
 
-	public static FetchStatus FetchClaszByOid(Connection aConn, Clasz aMasterObj, FieldObjectBox aFieldBox, ResultSet rset, int aPageSize, Class fieldClass, String aSortField, SortOrder aDisplayOrder) throws Exception {
+	
+	/*
+	@SuppressWarnings("unchecked")
+	private static FetchStatus FetchClaszByOid(Connection aConn, Clasz<?> aMasterObj, FieldObjectBox<?> aFieldBox, ResultSet rset, int aPageSize, Class<?> fieldClass, String aSortField, SortOrder aDisplayOrder) throws Exception {
 		FetchStatus result = FetchStatus.EOF;
 		aFieldBox.getObjectMap().clear();
 		int cntrRow = 0;
@@ -1880,7 +1951,7 @@ public class ObjectBase extends Database {
 				// can refactor as a spawner pattern in future
 				if (App.getMaxThread() == 1) { // no threading
 					cntrThreadPassAsRef[0]++;
-					(new FieldObjectBox.PopulateMemberObjectThreadPk(cntrThreadPassAsRef, aMasterObj, aConn, aFieldBox, leafClass, pk)).join();
+					(new FieldObjectBox.PopulateMemberObjectThreadPk(cntrThreadPassAsRef, aConn, aFieldBox, leafClass, pk)).join();
 				} else {
 					int cntrAttempt = 0;
 					int maxAttempt = App.MAX_GET_CONNECTION_ATTEMPT;
@@ -1895,7 +1966,7 @@ public class ObjectBase extends Database {
 								Thread.sleep(App.MAX_THREAD_OR_CONN_WAIT); // if max thread reach, wait continue the loop
 							} else { 
 								cntrThreadPassAsRef[0]++;
-								Thread theThread = new FieldObjectBox.PopulateMemberObjectThreadPk(cntrThreadPassAsRef, aMasterObj, conn, aFieldBox, leafClass, pk);
+								Thread theThread = new FieldObjectBox.PopulateMemberObjectThreadPk(cntrThreadPassAsRef, conn, aFieldBox, leafClass, pk);
 								threadPool.add(theThread);
 								break;
 							}
@@ -1929,20 +2000,21 @@ public class ObjectBase extends Database {
 		aFieldBox.sort();
 		return(result);
 	}
+	*/
 
 	// poopuate aMasterClasz if it has FieldObject of aWantedMember
-	public static boolean PopulateIfGotMember(Connection aConn, Clasz aMasterClasz, FieldObject aWantedMember) throws Exception {
+	public static boolean PopulateIfGotMember(Connection aConn, Clasz<?> aMasterClasz, FieldObject<?> aWantedMember) throws Exception {
 		boolean result = false;
 		PreparedStatement stmt;
 		ResultSet rset;
 
-		if (aMasterClasz.gotField(aWantedMember.getFieldName()) == false) {
-			throw new Hinderance("No such field: " + aWantedMember.getFieldName() + ", to populate clasz: " + aMasterClasz.getClaszName());
+		if (aMasterClasz.gotField(aWantedMember.getDbFieldName()) == false) {
+			throw new Hinderance("No such field: " + aWantedMember.getDbFieldName() + ", to populate clasz: " + aMasterClasz.getClaszName());
 		}
 
 		String masterTableName = aMasterClasz.getTableName();
 		String ivTableName = Clasz.GetIvTableName(aMasterClasz.getClass());
-		String memberName = aWantedMember.getFieldName();
+		String memberName = aWantedMember.getDbFieldName();
 		String leafClassColName = null;
 		String leafClassColValue = null;
 		if (aWantedMember.isPolymorphic()) {
@@ -1971,7 +2043,7 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 
-	public static String SetWhereClause(Connection aConn, Clasz aCriteria, List<Field> aryWhere) throws Exception {
+	public static String SetWhereClause(Connection aConn, Clasz<?> aCriteria, List<Field> aryWhere) throws Exception {
 		String sqlStr = null;
 		//Map<String, Record> whereBox = new ConcurrentHashMap<>(); // each table name (string) and a record for the where fields (record)
 		Multimap<String, Record> whereBox = Multimaps.synchronizedListMultimap(ArrayListMultimap.create());
@@ -1980,15 +2052,15 @@ public class ObjectBase extends Database {
 		//if (recWhere != null) {
 		if (whereBox.keySet().isEmpty() == false) {
 			StringBuffer strBuffer = new StringBuffer();
-			aryWhere = Database.GetWhereClause(whereBox, strBuffer); // convert the where record into array list
+			aryWhere = Database.GetWhereClause(aConn, whereBox, strBuffer); // convert the where record into array list
 			sqlStr = "select * from " + Database.GetFromClause(aCriteria.getTableName(), whereBox);
 			sqlStr += " where " + strBuffer.toString();
 		}
 		return(sqlStr);
 	}
 
-	public static Clasz GetMasterInstantUnique(Connection aConn, Class aMasterClass, String aMemberName, Clasz aMemberInstant) throws Exception {
-		List<Clasz> theMasterInstants = GetMasterInstant(aConn, aMasterClass, aMemberName, aMemberInstant);
+	public static Clasz<?> GetMasterInstantUnique(Connection aConn, Class<?> aMasterClass, String aMemberName, Clasz<?> aMemberInstant) throws Exception {
+		List<Clasz<?>> theMasterInstants = GetMasterInstant(aConn, aMasterClass, aMemberName, aMemberInstant);
 		switch (theMasterInstants.size()) {
 			case 0:
 				return(null);
@@ -1999,9 +2071,9 @@ public class ObjectBase extends Database {
 		}
 	}
 
-	public static List<Clasz> GetMasterInstant(Connection aConn, Class aMasterClass, String aMemberName, Clasz aMemberInstant) throws Exception {
-		CopyOnWriteArrayList<Clasz> result = new CopyOnWriteArrayList<>();
-		Clasz masterClasz = ObjectBase.CreateObject(aConn, aMasterClass);
+	public static List<Clasz<?>> GetMasterInstant(Connection aConn, Class<?> aMasterClass, String aMemberName, Clasz<?> aMemberInstant) throws Exception {
+		CopyOnWriteArrayList<Clasz<?>> result = new CopyOnWriteArrayList<>();
+		Clasz<?> masterClasz = ObjectBase.CreateClaszFreeType(aConn, aMasterClass);
 		if (masterClasz.gotField(aMemberName) == false) {
 			throw new Hinderance("Fail to get master instant: " + masterClasz.getClaszName() + ", no such field: " + aMemberName);
 		}
@@ -2022,7 +2094,7 @@ public class ObjectBase extends Database {
 			rset = stmt.executeQuery();
 			while (rset.next()) {
 				long pk = rset.getLong(1);
-				Clasz masterInstant = ObjectBase.CreateObject(aConn, aMasterClass);
+				Clasz<?> masterInstant = ObjectBase.CreateClaszFreeType(aConn, aMasterClass);
 				masterInstant.setObjectId(pk);
 				if (masterInstant.populate(aConn)) {
 					result.add(masterInstant);
@@ -2035,3 +2107,4 @@ public class ObjectBase extends Database {
 		return(result);
 	}
 }
+

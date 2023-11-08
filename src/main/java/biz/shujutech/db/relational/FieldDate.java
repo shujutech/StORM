@@ -10,8 +10,8 @@ public class FieldDate extends Field {
 	private DateTime valueDate;
 
 	public FieldDate(String aName) {
-		this.setFieldName(aName);
-		this.setFieldType(FieldType.DATE);
+		this.setDbFieldName(aName);
+		this.setDbFieldType(FieldType.DATE);
 	}
 
 	public FieldDate(String aName, DateTime aValue) throws Exception {
@@ -33,10 +33,12 @@ public class FieldDate extends Field {
 		this.setValueDate((DateTime) value);
 	}
 
+	/*
 	@Override
 	public Object getValueObj() {
 		return(valueDate);
 	}
+	*/
 
 	@Override
 	public Object getValueObj(Connection aConn) {

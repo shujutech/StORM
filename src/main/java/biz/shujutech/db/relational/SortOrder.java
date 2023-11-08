@@ -19,4 +19,14 @@ public enum SortOrder {
 		}
 		return(result);
 	}
+
+	public static SortOrder ReverseOrder(SortOrder aOrder) {
+		SortOrder result;
+		if (aOrder.equals(ASC)) {
+			result = DSC;
+		} else {
+			result = ASC;
+		}
+		return result;
+	}
 }

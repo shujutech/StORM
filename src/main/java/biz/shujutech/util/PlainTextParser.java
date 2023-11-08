@@ -1,9 +1,9 @@
 package biz.shujutech.util;
 
-import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.safety.Whitelist;
+import org.jsoup.safety.Safelist;
 
 /**
  * To parse HTML into plain text for text analysis
@@ -42,8 +42,6 @@ public class PlainTextParser {
 	 */
 	public static String cleanTagPerservingLineBreaks(String html) {
 		String result = "";
-		// result = Jsoup.clean(html, "", Whitelist.none(),
-		// new OutputSettings().prettyPrint(false));
 		if (html == null)
 			return html;
 		Document document = Jsoup.parse(html);
@@ -53,7 +51,7 @@ public class PlainTextParser {
 		document.select("br").append("\\n");
 		document.select("p").prepend("\\n\\n");
 		result = document.html().replaceAll("\\\\n", "\n");
-		result = Jsoup.clean(result, "", Whitelist.none(),
+		result = Jsoup.clean(result, "", Safelist.none(),
 				new Document.OutputSettings().prettyPrint(false));
 		return result;
 	}

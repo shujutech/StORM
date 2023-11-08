@@ -17,8 +17,10 @@ public class DateAndTime {
 	public static final String FORMAT_TIMEZONE = "dd-MMM-yyyy HH:mm:ss Z";
 	public static final String FORMAT_COMPARE_NO_TIME = "yyyyMMdd";
 	public static final String FORMAT_MONTH = "MMM, yyyy";
+	public static final String FORMAT_FOR_SORT_DATETIME = "yyyyMMddHHmmss";
+	public static final String FORMAT_FOR_SORT_DATE= "yyyyMMdd";
 
-	public DateTime DateAndTime(long aLong) {
+	public DateTime CreateDateAndTime(long aLong) {
 		java.util.Date date = new java.util.Date(aLong);
 		return(new DateTime(date));
 	}
@@ -64,11 +66,42 @@ public class DateAndTime {
 		return(result);
 	}
 
+	private static String FormatForSort(DateTime aDateTime, String aSortFormat) throws Exception {
+		if (aDateTime == null) return("");
+		DateTimeFormatter dtf = DateTimeFormat.forPattern(aSortFormat);
+		String result = dtf.print(aDateTime);
+		return(result);
+	}
+
+	public static String FormatDateTimeForSort(String aDateTime) throws Exception {
+		if (aDateTime == null) return("");
+		DateTime dateTime = DisplayStrToDateTime(aDateTime);
+		String result = FormatForSort(dateTime, FORMAT_FOR_SORT_DATETIME);
+		return(result);
+	}
+
+	public static String FormatDateForSort(String aDateTime) throws Exception {
+		if (aDateTime == null) return("");
+		DateTime dateTime = DisplayStrToDateTime(aDateTime);
+		String result = FormatForSort(dateTime, FORMAT_FOR_SORT_DATE);
+		return(result);
+	}
+
+	public static String FormatDateForSort(DateTime aDateTime) throws Exception {
+		if (aDateTime == null) return("");
+		String result = FormatForSort(aDateTime, FORMAT_FOR_SORT_DATE);
+		return(result);
+	}
+
 	public static DateTime StrToDateTime(String aStr, String aFormat) throws Exception {
-		if (aStr == null) return(null);
+		if (aStr == null || aStr.isEmpty()) return(null);
 		if (aFormat.equals(FORMAT_DISPLAY_NO_TIME)) {
 			if (aStr.length() > aFormat.length()) {
-				aStr = aStr.substring(0, aStr.indexOf(" "));
+				if (aStr.contains(" ")) { // this is for macos, its Sep is Sept
+					aStr = aStr.substring(0, aStr.indexOf(" "));
+				} else {
+					App.logWarn("Removing time from datetime of string: " + aStr + ", is not possible");
+				}
 			}
 		}
 		DateTimeFormatter formatter = DateTimeFormat.forPattern(aFormat);
@@ -77,11 +110,15 @@ public class DateAndTime {
 	}
 
 	public static DateTime DisplayStrToDateTime(String aStr) throws Exception {
-		if (aStr == null) return(null);
+		if (aStr == null || aStr.isEmpty()) return(null);
 		if (aStr.length() < FORMAT_DISPLAY_WITH_TIME.length()) {
 			return(StrToDateTime(aStr, FORMAT_DISPLAY_NO_TIME));
 		} else {
-			return(StrToDateTime(aStr, FORMAT_DISPLAY_WITH_TIME));
+			if (aStr.length() > FORMAT_DISPLAY_WITH_TIME.length()) {
+				return(StrToDateTime(aStr, FORMAT_TIMEZONE));
+			} else {
+				return(StrToDateTime(aStr, FORMAT_DISPLAY_WITH_TIME));
+			}
 		}
 	}
 
@@ -153,6 +190,12 @@ public class DateAndTime {
 		return(SetZeroTime(dateOfMonth));
 	}
 
+	public static DateTime CreateDateTime(int aYear, int aMonth, int aDay, int a24Hour, int aMin, int aSec) throws Exception {
+		DateTime result = CreateDateTime(aYear, aMonth, aDay);
+		result = result.withTime(a24Hour, aMin, aSec, 0);
+		return(result);
+	}
+
 	public static String FormatForCompareNoTime(DateTime aDateTime) throws Exception {
 		if (aDateTime == null) return(null);
 		DateTimeFormatter dtf = DateTimeFormat.forPattern(FORMAT_COMPARE_NO_TIME);
@@ -172,6 +215,15 @@ public class DateAndTime {
 		if ((aTarget.isEqual(aFrom) || aTarget.isAfter(aFrom))
 		&& (aTarget.isEqual(aTo) || aTarget.isBefore(aTo))
 		) {
+			result = true;
+		}
+		return(result);
+	}
+
+	public static boolean IsOverlap(DateTime aStart, DateTime aEnd, DateTime aFrom, DateTime aTo) throws Exception {
+		boolean result = false;
+		if (DateAndTime.IsBetween(aStart, aFrom, aTo) || DateAndTime.IsBetween(aEnd, aFrom, aTo)
+		|| DateAndTime.IsBetween(aFrom, aStart, aEnd)) {
 			result = true;
 		}
 		return(result);

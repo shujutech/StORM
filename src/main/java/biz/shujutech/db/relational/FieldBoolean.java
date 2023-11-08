@@ -6,8 +6,8 @@ public class FieldBoolean extends Field {
 	private Boolean valueBoolean;
 
 	public FieldBoolean(String aName) {
-		this.setFieldName(aName);
-		this.setFieldType(FieldType.BOOLEAN);
+		this.setDbFieldName(aName);
+		this.setDbFieldType(FieldType.BOOLEAN);
 	}
 
 	public Boolean getValueBoolean() {
@@ -21,13 +21,16 @@ public class FieldBoolean extends Field {
 
 	@Override
 	public void setValue(Object value) {
+		this.setModified(true);
 		this.setValueBoolean((Boolean) value);
 	}
 
+	/*
 	@Override
 	public Object getValueObj() {
 		return(valueBoolean);
 	}
+	*/
 
 	@Override
 	public Object getValueObj(Connection aConn) {
@@ -57,7 +60,7 @@ public class FieldBoolean extends Field {
 			} else if (valueStr.equals("0")) { 
 				this.setValueBoolean(false);
 			} else {
-				throw new Exception("Invalid value: " + valueStr + ", for field of boolean type, field: " + this.getFieldName().toUpperCase());
+				throw new Exception("Invalid value: " + valueStr + ", for field of boolean type, field: " + this.getDbFieldName().toUpperCase());
 			}
 		}
 

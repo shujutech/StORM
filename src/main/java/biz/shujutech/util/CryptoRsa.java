@@ -121,7 +121,8 @@ public class CryptoRsa {
 	public static void main(String[] args) throws Exception {
 		CryptoRsa cryptoRsa = new CryptoRsa();
 
-		String msg = "This is testing cryptography";
+		//String msg = "This is testing cryptography";
+		String msg = "mooickxskhpicmaw";
 		String encryptedMsg = cryptoRsa.encryptText(msg, BASE64_PUBLIC_KEY);
 		String decryptedMsg = cryptoRsa.decryptText(encryptedMsg, BASE64_PRIVATE_KEY);
 		System.out.println("Original Message: " + msg + "\nEncrypted Message: " + encryptedMsg + "\nDecrypted Message: " + decryptedMsg);

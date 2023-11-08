@@ -8,22 +8,21 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.List;
 
-public class ResultSetFetch{
+public class ResultSetFetch {
 	private final PreparedStatement stmt = null;
 	private ResultSet rs = null;
 	private Connection conn;
-	private Class fetchClass;
 
-	public void forEachFetch(Connection aConn, Class aClass, String aSqlToGetObjId, List<Field> aPositionalParamValue, Callback2ProcessClasz aCallback) throws Exception {
+	public <Ty extends Clasz<?>> void forEachFetch(Connection aConn, Class<Ty> aClass, String aSqlToGetObjId, List<Field> aPositionalParamValue, Callback2ProcessMember<Ty> aCallback) throws Exception {
 		this.conn = aConn;
-		this.fetchClass = aClass;
-		String pkColName = Clasz.CreatePkColName(this.fetchClass);
+		String pkColName = Clasz.CreatePkColName(aClass);
 		this.rs = Clasz.Fetch(this.conn, this.stmt, aSqlToGetObjId, aPositionalParamValue);
 		try {
 			while(this.rs.next()) {
 				Long objId = this.rs.getLong(pkColName);
-				Clasz clasz = Clasz.Fetch(this.conn, this.fetchClass, objId);
-				aCallback.processClasz(aConn, clasz);
+				//Clasz<?> clasz = Clasz.Fetch(this.conn, this.fetchClass, objId);
+				Clasz<?> clasz = Clasz.Fetch(this.conn, aClass, objId);
+				aCallback.processClasz(aConn, aClass.cast(clasz));
 			}
 		} catch (Exception ex) {
 			throw new Hinderance(ex, "Fail sql resultsetFetch: " + aSqlToGetObjId);
@@ -37,24 +36,18 @@ public class ResultSetFetch{
 		}
 	}
 
-	/*
-	private Table table;
-	public void forEachFetch(Connection aConn, Class aClass, Record aWhere, ResultSetFetchIntf aCallback) throws Exception {
+	public <Ty extends Clasz<?>> void forEachFetchFreeType(Connection aConn, Class<?> aClass, String aSqlToGetObjId, List<Field> aPositionalParamValue, Callback2ProcessMemberFreeType aCallback) throws Exception {
 		this.conn = aConn;
-		this.clasz = aClass;
-		this.table = new Table(Clasz.CreateTableName(this.clasz.getSimpleName()));
-		Record selectRec = new Record();
-		String pkColName = Clasz.CreatePkName(this.clasz.getSimpleName());
-		selectRec.createFieldObject(pkColName, FieldType.LONG);
-		this.rs = Clasz.Fetch(this.conn, this.stmt, this.table.getTableName(), selectRec, aWhere);
+		String pkColName = Clasz.CreatePkColName(aClass);
+		this.rs = Clasz.Fetch(this.conn, this.stmt, aSqlToGetObjId, aPositionalParamValue);
 		try {
 			while(this.rs.next()) {
 				Long objId = this.rs.getLong(pkColName);
-				Clasz clasz = Clasz.Fetch(this.conn, this.clasz.getClass(), objId);
-				aCallback.callback(clasz);
+				Clasz<?> clasz = Clasz.FetchFreeType(this.conn, aClass, objId);
+				aCallback.processClasz(aConn, aClass.cast(clasz));
 			}
 		} catch (Exception ex) {
-			throw new Hinderance(ex, "Fail sql resultsetFetch: " + this.stmt.toString());
+			throw new Hinderance(ex, "Fail sql resultsetFetch: " + aSqlToGetObjId);
 		} finally {
 			if (this.rs != null) {
 				this.rs.close();
@@ -64,5 +57,4 @@ public class ResultSetFetch{
 			}
 		}
 	}
-	*/
 }

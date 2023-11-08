@@ -18,6 +18,9 @@ import java.sql.ResultSetMetaData;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import biz.shujutech.technical.Callback2ProcessRecord;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 
 public class Table extends Base {
 	public static final String POSTFIX_FIELD_CHILD_COUNT = "_cc";
@@ -79,7 +82,7 @@ public class Table extends Base {
 		String result = this.getTableName();
 		for (Field eachField : this.getMetaRec().getFieldBox().values()) {
 			if (eachField.isObjectKey()) {
-				result += "_" + Database.Java2DbFieldName(eachField.getFieldName());
+				result += "_" + Database.Java2DbFieldName(eachField.getDbFieldName());
 			}
 		}
 		if (result.length() > 64) {
@@ -92,7 +95,7 @@ public class Table extends Base {
 		String indexName = aTableName;
 		for (Field eachField : aIndexField) {
 			if (eachField.isIndexKey()) {
-				indexName += "_" + Database.Java2DbFieldName(eachField.getFieldName());
+				indexName += "_" + Database.Java2DbFieldName(eachField.getDbFieldName());
 			}
 		}
 		if (indexName.length() > 64) {
@@ -108,7 +111,7 @@ public class Table extends Base {
 	}
 
 	public Record getRecord(long aIndex) {
-		return(this.getRecordBox().get(new Long(aIndex)));
+		return(this.getRecordBox().get(Long.valueOf(aIndex)));
 	}
 
 	public Field createField(String aName, FieldType aType) throws Exception {
@@ -177,7 +180,7 @@ public class Table extends Base {
 			result = this.metaRec;
 		} else {
 			result = new Record();
-			result.createField(this.metaRec); // create the structure of the meta rec to indexName
+			result.createField(aConn, this.metaRec); // create the structure of the meta rec to indexName
 		}
 		
 		return(result);
@@ -214,6 +217,8 @@ public class Table extends Base {
 				int colType = rsmdSet.getColumnType(cntrCol);
 				Field createdField = this.createField(colName, Database.JavaSqlType2FieldType(colType));
 				if (this.pkColName.equals(colName.toLowerCase())) createdField.setPrimaryKey();
+				int colSize = rsmdSet.getPrecision(cntrCol);
+				createdField.setFieldSize(colSize);
 			}
 		} finally {
 			if (stmtMeta != null) stmtMeta.close();
@@ -278,7 +283,7 @@ public class Table extends Base {
 			String sqlFieldToUpdate = strUpdate.toString();
 
 			StringBuffer strBuffer = new StringBuffer();
-			List<Field> fieldWhere = Database.GetWhereClause(aTableName, aRecWhere, strBuffer);
+			List<Field> fieldWhere = Database.GetWhereClause(aConn, aTableName, aRecWhere, strBuffer);
 			String sqlWhere = strBuffer.toString();
 
 			// place in the fields values and set the sql string
@@ -288,7 +293,7 @@ public class Table extends Base {
 
 			String sqlUpd = "update " + aTableName + " set " + sqlFieldToUpdate + " where " + sqlWhere;
 			stmtUpd = aConn.prepareStatement(sqlUpd);
-			Database.SetStmtValue(stmtUpd, fieldArr);
+			Database.SetStmtValue(aConn, stmtUpd, fieldArr);
 			//App.logDebg(Table.class, "dml_update: " + stmtUpd.toString());
 
 			result = stmtUpd.executeUpdate();
@@ -343,17 +348,20 @@ public class Table extends Base {
 		Connection connRemove = null;
 		try {
 			StringBuffer strBuffer = new StringBuffer();
-			List<Field> fieldArr = Database.GetWhereClause(aTableName, aWhere, strBuffer);
+			List<Field> fieldArr = Database.GetWhereClause(aConn, aTableName, aWhere, strBuffer);
 			String sqlWhere = strBuffer.toString();
 
 			String strRemove = "delete from " + aTableName + " where " + sqlWhere;
 			connRemove = aConn;
 			stmtRemove = connRemove.prepareStatement(strRemove);
-			Database.SetStmtValue(stmtRemove, fieldArr);
+			Database.SetStmtValue(aConn, stmtRemove, fieldArr);
 			App.logWarn(Table.class, "Deleting object: " + stmtRemove.toString()); // for any deletion, we log them
 			result = stmtRemove.executeUpdate(); // if got child object, this delete will not happen, silently ignore
 		} catch(Exception ex) {
-			throw new Hinderance(ex, "Fail to delete: " + stmtRemove.toString());
+			if (stmtRemove == null)
+				throw new Hinderance(ex, "Fail to delete from table: " + aTableName);
+			else
+				throw new Hinderance(ex, "Fail to delete: " + stmtRemove.toString());
 		} finally {
 			if (stmtRemove != null) stmtRemove.close();
 		}
@@ -406,9 +414,9 @@ public class Table extends Base {
 			String sqlField = strField.toString();
 			String sqlHolder = strHolder.toString();
 
-			String sqlIns = "insert into " + aTableName + "(" + sqlField + ") values (" + sqlHolder + ")";
+			String sqlIns = "insert into " + aTableName + " " + "(" + sqlField + ") values (" + sqlHolder + ")";
 			stmtIns = aConn.prepareStatement(sqlIns);
-			Database.SetStmtValue(stmtIns, fieldInsert);
+			Database.SetStmtValue(aConn, stmtIns, fieldInsert);
 			//App.logDebg(Table.class, "dml_insert: " + stmtIns.toString());
 
 			result = stmtIns.executeUpdate();
@@ -431,7 +439,7 @@ public class Table extends Base {
 			throw new Hinderance("Table: " + this.getTableName() + ", fields is not defined, fetch fail");
 		}
 
-		Long result = new Long(this.getRecordBox().size());
+		Long result = Long.valueOf(this.getRecordBox().size());
 		PreparedStatement stmt = null;
 		ResultSet rs = null;
 		try {
@@ -458,7 +466,7 @@ public class Table extends Base {
 			throw new Hinderance("Table: " + this.getTableName() + ", fields is not defined, fetch fail");
 		}
 
-		Long result = new Long(this.getRecordBox().size());
+		Long result = Long.valueOf(this.getRecordBox().size());
 		PreparedStatement stmt = null;
 		ResultSet rs = null;
 		try {
@@ -518,7 +526,7 @@ public class Table extends Base {
 		ResultSet rs;
 		try {
 			stmt = aConn.prepareStatement(aSqlToGetObjId);
-			Database.SetStmtValue(stmt, aFieldValue);
+			Database.SetStmtValue(aConn, stmt, aFieldValue);
 			rs = stmt.executeQuery();
 			return(rs);
 		} catch(Exception ex) {
@@ -530,21 +538,30 @@ public class Table extends Base {
 		return(Table.Fetch(aConn, stmt, this.getTableName(), aSelect, aWhere));
 	}
 
+	/*
 	public static ResultSet Fetch(Connection aConn, PreparedStatement stmt, String aTableName, Record aSelect, Record aWhereRec) throws Exception {
-		return Fetch(aConn, stmt, aTableName, aSelect, aWhereRec, null);
+		return Fetch(aConn, stmt, aTableName, aSelect, aWhereRec);
 	}
+	*/
 
-	public static ResultSet Fetch(Connection aConn, PreparedStatement stmt, String aTableName, Record aSelect, Record aWhereRec, String aWhereStr) throws Exception {
-		List<Object> objForSql = GetFetchObject(aTableName, aSelect, aWhereRec, aWhereStr);
+	@SuppressWarnings("unchecked")
+	public static ResultSet Fetch(Connection aConn, PreparedStatement stmt, String aTableName, Record aSelect, Record aWhereRec) throws Exception {
+		List<Object> objForSql = Table.GetSqlAndBindArray(aConn, aTableName, aSelect, aWhereRec);
 		String sqlStr = (String) objForSql.get(0);
 		List<Field> fieldArr = (List<Field>) objForSql.get(1);
 		stmt = aConn.prepareStatement(sqlStr);
-		Database.SetStmtValue(stmt, fieldArr);
+		Database.SetStmtValue(aConn, stmt, fieldArr);
 		ResultSet rs = stmt.executeQuery();
 		return(rs);
 	}
 
-	public static List<Object> GetFetchObject(String aTableName, Record aSelect, Record aWhereRec, String aWhereStr) throws Exception {
+	public static List<Object> GetSqlAndBindArray(Connection aConn, String aTableName, Record aSelect, Record aWhereRec) throws Exception {
+		Multimap<String, Record> whereBox = Multimaps.synchronizedListMultimap(ArrayListMultimap.create());
+		whereBox.put(aTableName, aWhereRec);
+		return(GetSqlAndBindArray(aConn, aTableName, aSelect, whereBox));
+	}
+
+	public static List<Object> GetSqlAndBindArray(Connection aConn, String aPrimaryTable, Record aSelect, Multimap<String, Record> aWhereBox) throws Exception {
 		List<Object> result = new CopyOnWriteArrayList<>();
 		String sqlStr = "";
 		try {
@@ -557,23 +574,26 @@ public class Table extends Base {
 					if (cntrSelect != 0) {
 						sqlSelect += ", ";
 					}
-					if (eachField.getFieldType() == FieldType.ENCRYPT) {
-						sqlSelect += Database.DdlForDecrypt(eachField.getFieldName());
+					if (eachField.getDbFieldType() == FieldType.ENCRYPT) {
+						sqlSelect += Database.DdlForDecrypt(eachField.getDbFieldName());
 					} else {
-						sqlSelect += eachField.getFieldName();
+						sqlSelect += eachField.getDbFieldName();
 					}
 					cntrSelect++;
 				}
 			}
 
 			StringBuffer strBuffer = new StringBuffer();
-			List<Field> fieldArr = Database.GetWhereClause(aTableName, aWhereRec, strBuffer);
-			String sqlWhere = strBuffer.toString();
+//List<Field> fieldArr = Database.GetWhereClause(aTableName, aWhereBox, strBuffer);
+//String sqlWhere = strBuffer.toString();
+List<Field> fieldArr = Database.GetWhereClause(aConn, aWhereBox, strBuffer);
 
-			sqlStr = "select " + sqlSelect + " from " + aTableName + " where " + sqlWhere;
-			if (aWhereStr != null && aWhereStr.isEmpty() == false) {
-				sqlStr += " and " + aWhereStr;
-			}
+//sqlStr = "select " + sqlSelect + " from " + aTableName + " where " + sqlWhere;
+//if (aWhereStr != null && aWhereStr.isEmpty() == false) {
+//	sqlStr += " and " + aWhereStr;
+//}
+sqlStr = "select " + sqlSelect + " from " + Database.GetFromClause(aPrimaryTable, aWhereBox);
+if (strBuffer.toString().isEmpty() == false) sqlStr += " where " + strBuffer.toString();
 
 			result.add(sqlStr);
 			result.add(fieldArr);
@@ -617,7 +637,7 @@ public class Table extends Base {
 
 	private void sortObjectBox(String aFieldName, SortOrder aOrder) throws Exception {
 		if ((this.getField(aFieldName) instanceof FieldObjectBox) == false) {
-			throw new Hinderance("Only array of objects field can be sorted, cannot sort field: " + this.getField(aFieldName).getFieldName());
+			throw new Hinderance("Only array of objects field can be sorted, cannot sort field: " + this.getField(aFieldName).getDbFieldName());
 		}
 
 		RecordComparator recordComparator = new RecordComparator(this.getRecordBox(), aFieldName, aOrder);

@@ -4,7 +4,6 @@ import biz.shujutech.base.App;
 import biz.shujutech.base.Connection;
 import biz.shujutech.base.Hinderance;
 import biz.shujutech.db.relational.Database;
-import biz.shujutech.db.relational.Database.DbType;
 import biz.shujutech.db.relational.Field;
 import biz.shujutech.db.relational.FieldType;
 import biz.shujutech.db.relational.Record;
@@ -20,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ObjectIndex {
 
-	public static void DeleteIndex(Connection aConn, Clasz aClasz2Update) throws Exception {
+	public static void DeleteIndex(Connection aConn, Clasz<?> aClasz2Update) throws Exception {
 		Record whereRecord = new Record();
 		whereRecord.createField(aClasz2Update.getPkName(), aClasz2Update.getObjectId());
 		for(String eachIndexName : GetAllIndexName(aConn, aClasz2Update)) { // for each index
@@ -29,13 +28,13 @@ public class ObjectIndex {
 		}
 	}
 
-	public static void UpdateIndexAll(Connection aConn, Clasz aClasz2Update) throws Exception {
+	public static void UpdateIndexAll(Connection aConn, Clasz<?> aClasz2Update) throws Exception {
 		for(String eachIndexName : GetAllIndexName(aConn, aClasz2Update)) { // for each index
 			UpdateIndex(aConn, aClasz2Update, eachIndexName, false);
 		}
 	}
 
-	public static void UpdateIndex(Connection aConn, Clasz aClasz2Update, String eachIndexName, boolean aItsPopulate) throws Exception {
+	public static void UpdateIndex(Connection aConn, Clasz<?> aClasz2Update, String eachIndexName, boolean aItsPopulate) throws Exception {
 		try {
 			//List<String> indexColumn = GetIndexColumn(aConn, eachIndexName, objId, aClasz2Update.getPkName()); // the column name is use to determine which field is being index on
 			List<String> indexColumn = GetIndexColumn(aConn, eachIndexName); // the column name is use to determine which field is being index on
@@ -55,10 +54,10 @@ public class ObjectIndex {
 		}
 	}
 
-	public static boolean IndexPopulated(Record aIndexRec) throws Exception {
+	public static boolean IndexPopulated(Connection aConn, Record aIndexRec) throws Exception {
 		boolean result = true;
 		for(Field eachField : aIndexRec.getFields()) {
-			if (eachField.getValueObj() == null) {
+			if (eachField.getValueObj(aConn) == null) {
 				result = false;
 				break;
 			}
@@ -66,90 +65,79 @@ public class ObjectIndex {
 		return(result);
 	}
 
-	private static void TraverseForInsertOrUpdate(Connection bConn, Record whereRec, String colName, Clasz eachClasz, Record newIndexRec, String leafClassColName, Table aIndexTable, List<String> aIndexColumn, Record aIndexRec, Record aWhereRec, boolean aItsPopulate) throws Exception {
+	private static void TraverseForInsertOrUpdate(Connection bConn, Record whereRec, String colName, Clasz<?> eachClasz, Record newIndexRec, String leafClassColName, Table aIndexTable, List<String> aIndexColumn, Record aIndexRec, Record aWhereRec, boolean aItsPopulate) throws Exception {
 		whereRec.getField(colName).setValue(eachClasz.getObjectId()); // as it traverse, collect the related objectid into the where rec
 		newIndexRec.getField(colName).setValue(eachClasz.getObjectId());
 		String leafClass = eachClasz.getClass().getName();
 		whereRec.getField(leafClassColName).setValueStr(leafClass);
 		newIndexRec.getField(leafClassColName).setValue(leafClass); 
-		if (IndexPopulated(newIndexRec)) {
+		if (IndexPopulated(bConn, newIndexRec)) {
 			InsertOrUpdateIndex(bConn, aIndexTable, newIndexRec, whereRec);
 		} else {
 			TraverseObjForUpdate(bConn, eachClasz, aIndexColumn, aIndexTable, newIndexRec, whereRec, colName, aItsPopulate);
 		}
-		newIndexRec.copyStrNull(aIndexRec); // reinit the index record to the before state for the next traverse
-		whereRec.copyStrNull(aWhereRec);
+		newIndexRec.copyStrNull(bConn, aIndexRec); // reinit the index record to the before state for the next traverse
+		whereRec.copyStrNull(bConn, aWhereRec);
 	}
 
-	private static void TraverseObjForUpdate(Connection aConn, Clasz aClasz, List<String> aIndexColumn, Table aIndexTable, Record aIndexRec, Record aWhereRec, String aFqFieldName, boolean aItsPopulate) throws Exception {
+	@SuppressWarnings("unchecked")
+	private static void TraverseObjForUpdate(Connection aConn, Clasz<?> aClasz, List<String> aIndexColumn, Table aIndexTable, Record aIndexRec, Record aWhereRec, String aFqFieldName, boolean aItsPopulate) throws Exception {
 		for(Field eachField : aClasz.getTreeField().values()) { 
-			String colName = GetFqFieldName(aFqFieldName, eachField.getFieldName());
+			String colName = GetFqFieldName(aFqFieldName, eachField.getDbFieldName());
 			if (aIndexColumn.contains(colName)) {
-				if (eachField.getFieldType() == FieldType.OBJECT) {
-					if (eachField.getValueObj() != null) {
-						Long objId = ((FieldObject) eachField).getValueObj(aConn).getObjectId();
+				//if (eachField.getFieldType() == FieldType.OBJECT) {
+				if (eachField instanceof FieldObject) {
+					if (eachField.getValueObj(aConn) != null) {
+						Long objId = ((FieldObject<?>) eachField).getValueObj(aConn).getObjectId();
 						aWhereRec.createField(colName, objId); // as it traverse, collect the related objectid into the where rec
 						aIndexRec.getField(colName).setValue(objId); // as it traverse, collect the related field value into the index rec
 						//if (eachField.isPolymorphic()) {}
-						String leafClass = ((FieldObject) eachField).getValueObj(aConn).getClass().getName();
+						String leafClass = ((FieldObject<?>) eachField).getValueObj(aConn).getClass().getName();
 						String leafClassColName = Clasz.CreateLeafClassColName(colName);	
 						aWhereRec.createField(leafClassColName, leafClass);
 						aIndexRec.getField(leafClassColName).setValue(leafClass); // as it traverse, collect the related field value into the index rec
-						if (IndexPopulated(aIndexRec)) { // if the index is fully populated, insert/update the index and its consider complete
+						if (IndexPopulated(aConn, aIndexRec)) { // if the index is fully populated, insert/update the index and its consider complete
 							InsertOrUpdateIndex(aConn, aIndexTable, aIndexRec, aWhereRec);
 							break;
 						} else {
-							Clasz fieldClasz = (Clasz) eachField.getValueObj();
+							Clasz<?> fieldClasz = (Clasz<?>) eachField.getValueObj(aConn);
 							TraverseObjForUpdate(aConn, fieldClasz, aIndexColumn, aIndexTable, aIndexRec, aWhereRec, colName, aItsPopulate);
 						}
 					}
-				} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
-					FieldObjectBox fob = (FieldObjectBox) eachField;
+				//} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
+				} else if (eachField instanceof FieldObjectBox<?>) {
+					FieldObjectBox<Clasz<?>> fob = (FieldObjectBox<Clasz<?>>) eachField;
 					aWhereRec.createField(colName, FieldType.LONG);
 					String leafClassColName = Clasz.CreateLeafClassColName(colName);	
 					aWhereRec.createField(leafClassColName, FieldType.STRING, ObjectBase.CLASS_NAME_LEN);
-					Record newIndexRec = aIndexTable.createRecord(aConn); newIndexRec.copyStrNull(aIndexRec); // copy the state of this index record into a new index record
-					Record whereRec = new Record(aWhereRec); whereRec.copyStrNull(aWhereRec);
+					Record newIndexRec = aIndexTable.createRecord(aConn); newIndexRec.copyStrNull(aConn, aIndexRec); // copy the state of this index record into a new index record
+					Record whereRec = new Record(aWhereRec); whereRec.copyStrNull(aConn, aWhereRec);
 					if (aItsPopulate) { // read all record and update the index
-						List<Exception> excptInLambda = new CopyOnWriteArrayList<>();
-						fob.forEachMember(aConn, ((Connection bConn, Clasz eachClasz) -> { // loop thru fieldobjectbox and recursive call  
+						//List<Exception> excptInLambda = new CopyOnWriteArrayList<>();
+						fob.forEachMember(aConn, (Connection bConn, Clasz<?> eachClasz) -> { // loop thru fieldobjectbox and recursive call  
 							try {
 								TraverseForInsertOrUpdate(bConn, whereRec, colName, eachClasz, newIndexRec, leafClassColName, aIndexTable, aIndexColumn, aIndexRec, aWhereRec, aItsPopulate);
 								return(true);
 							} catch(Exception ex) {
-								excptInLambda.add(ex);
-								return(false);
+								//excptInLambda.add(ex);
+								//return(false);
+								throw new Hinderance(ex, "Fail while object indexing: " + aClasz.getClass().getSimpleName() + ", field: " + aFqFieldName);
 							}
-						}));
+						});
+						/*
 						// exception inside a lambda expression, we'll bombs out if its happen, couldn't handle this in lambda content
 						if (excptInLambda.isEmpty() == false) {
 							throw new Hinderance(excptInLambda.get(0), "Fail while object indexing: " + aClasz.getClass().getSimpleName() + ", field: " + aFqFieldName);
 						}
+						*/
 					} else {
-						for (Clasz eachClasz : fob.getObjectMap().values()) { // update index of the populated object in the FieldObjectBox
+						for (Clasz<?> eachClasz : fob.getObjectMap().values()) { // update index of the populated object in the FieldObjectBox
 							TraverseForInsertOrUpdate(aConn, whereRec, colName, eachClasz, newIndexRec, leafClassColName, aIndexTable, aIndexColumn, aIndexRec, aWhereRec, aItsPopulate);
 						}
 					} 
-					/*
-					for (Clasz eachClasz : fob.getObjectMap().values()) { // loop thru fieldobjectbox and recursive call 
-						whereRec.getField(colName).setValue(eachClasz.getObjectId()); // as it traverse, collect the related objectid into the where rec
-						newIndexRec.getField(colName).setValue(eachClasz.getObjectId());
-						//if (eachField.isPolymorphic()) {}
-						String leafClass = eachClasz.getClass().getName();
-						whereRec.getField(leafClassColName).setValueStr(leafClass);
-						newIndexRec.getField(leafClassColName).setValue(leafClass); // as it traverse, collect the related field value into the index rec
-						if (IndexPopulated(newIndexRec)) {
-							InsertOrUpdateIndex(aConn, aIndexTable, newIndexRec, whereRec);
-						} else {
-							TraverseObjForUpdate(aConn, eachClasz, aIndexColumn, aIndexTable, newIndexRec, whereRec, colName);
-						}
-						newIndexRec.copyStrNull(aIndexRec); // reinit the index record to the before state for the next traverse
-						whereRec.copyStrNull(aWhereRec);
-					}
-					*/
 				} else {
-					aIndexRec.getField(colName).setValue(eachField.getValueObj());
-					if (IndexPopulated(aIndexRec)) {
+					aIndexRec.getField(colName).setValue(eachField.getValueObj(aConn));
+					if (IndexPopulated(aConn, aIndexRec)) {
 						InsertOrUpdateIndex(aConn, aIndexTable, aIndexRec, aWhereRec);
 					} 
 				}
@@ -196,24 +184,24 @@ public class ObjectIndex {
 	 * @return 
 	 * @throws java.lang.Exception
 	 */
-	public static String GetObjectIndexName(Connection aConn, Clasz aClasz) throws Exception {
+	public static String GetObjectIndexName(Connection aConn, Clasz<?> aClasz) throws Exception {
 		List<Field> aryFieldObjId= new CopyOnWriteArrayList<>();
 		List<Field> aryFieldData = new CopyOnWriteArrayList<>();
-		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz, "");
+		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz);
 		String objIndexName = GetObjectIndexName(aConn, aClasz, aryFieldObjId);
 		return(objIndexName);
 	}
 
-	public static String CreateObjectIndex(Connection aConn, Clasz aClasz) throws Exception {
+	public static String CreateObjectIndex(Connection aConn, Clasz<?> aClasz) throws Exception {
 		List<Field> aryFieldObjId = new CopyOnWriteArrayList<>();
 		List<Field> aryFieldData = new CopyOnWriteArrayList<>();
-		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz, "");
+		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz);
 		String objIndexName = GetObjectIndexName(aConn, aClasz, aryFieldObjId);
 		CreateObjectIndexTable(aConn, objIndexName, aryFieldObjId, aryFieldData, aClasz);
 		return(objIndexName);
 	}
 
-	private static void CreateObjectIndexTable(Connection aConn, String objIndexName, List<Field> aryFieldObjId, List<Field>aryFieldData, Clasz aClasz) throws Exception {
+	private static void CreateObjectIndexTable(Connection aConn, String objIndexName, List<Field> aryFieldObjId, List<Field>aryFieldData, Clasz<?> aClasz) throws Exception {
 		if (Database.TableExist(aConn, objIndexName) == false) {
 			int pkSeq = 0;
 			Table indexTable = new Table(objIndexName);
@@ -233,10 +221,10 @@ public class ObjectIndex {
 			List<Field> dataFieldForIndexing = new CopyOnWriteArrayList<>();
 			for(Field eachField : aryFieldData) { // now create the data field for indexing
 				String colName = Database.Java2DbFieldName(eachField.getFqName());
-				if (eachField.getFieldType() == FieldType.STRING) {
+				if (eachField.getDbFieldType() == FieldType.STRING) {
 					dataFieldForIndexing.add(indexTable.createField(colName, FieldType.STRING, eachField.getFieldSize()));
 				} else {
-					dataFieldForIndexing.add(indexTable.createField(colName, eachField.getFieldType()));
+					dataFieldForIndexing.add(indexTable.createField(colName, eachField.getDbFieldType()));
 				}
 			}
 
@@ -256,14 +244,14 @@ public class ObjectIndex {
 		}
 	}
 
-	public static String GetObjectIndexName(Connection aConn, Clasz aClasz, List<Field> colBox) throws Exception {
+	public static String GetObjectIndexName(Connection aConn, Clasz<?> aClasz, List<Field> colBox) throws Exception {
 		String prefixName = Clasz.GetObjectIndexPrefix();
 		String allFieldObjName = "";
 		for(Field eachField : colBox) { // get all the marked field for indexing from the object
 			if (allFieldObjName.isEmpty() == false) {
 				allFieldObjName += "_";
 			}
-			allFieldObjName += eachField.getFieldName().toLowerCase();
+			allFieldObjName += eachField.getDbFieldName().toLowerCase();
 		}
 		String clsName = Database.Java2DbTableName(aClasz.getClass().getSimpleName());
 		String idxName = prefixName + clsName;
@@ -273,9 +261,13 @@ public class ObjectIndex {
 		return(idxName);
 	}
 
-	public static void GetAllIndexKey(List<Field> aryFieldObjId, List<Field> aryFieldData, Clasz aClasz, String aFqFieldName) throws Exception {
+	public static void GetAllIndexKey(List<Field> aryFieldObjId, List<Field> aryFieldData, Clasz<?> aClasz) throws Exception {
+		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz, "");
+	}
+
+	private static void GetAllIndexKey(List<Field> aryFieldObjId, List<Field> aryFieldData, Clasz<?> aClasz, String aFqFieldName) throws Exception {
 		for(Field eachField : aClasz.getTreeField().values()) { 
-			String fqName = GetFqFieldName(aFqFieldName, eachField.getFieldName());
+			String fqName = GetFqFieldName(aFqFieldName, eachField.getDbFieldName());
 			if (eachField.isAtomic()) {
 				if (eachField.isObjectKey()) {
 					eachField.setFqName(fqName);
@@ -283,18 +275,18 @@ public class ObjectIndex {
 				}
 			} else {
 				if (eachField.isObjectKey()) {
-					if (eachField.getFieldType() == FieldType.OBJECT) {
-						Clasz clasz = ((FieldObject) eachField).getObj();
+					if (eachField.getDbFieldType() == FieldType.OBJECT) {
+						Clasz<?> clasz = ((FieldObject<?>) eachField).getObj();
 						if (clasz != null) {
 							eachField.setFqName(fqName);
 							aryFieldObjId.add(eachField);
 							GetAllIndexKey(aryFieldObjId, aryFieldData, clasz, fqName); // recursive call to clear the member object index keys
 							break; // once get a field object for indexing, never look for others, only support one fieldobject at any one time
 						}
-					} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
+					} else if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
 						eachField.setFqName(fqName);
 						aryFieldObjId.add(eachField);
-						Clasz clasz = ((FieldObjectBox) eachField).getMetaObj();
+						Clasz<?> clasz = ((FieldObjectBox<?>) eachField).getMetaObj();
 						GetAllIndexKey(aryFieldObjId, aryFieldData, clasz, fqName); // recursive call to clear the object index keys
 						break; // once get a field object for indexing, never look for others, only support one fieldobject at any one time
 					} else {
@@ -312,25 +304,25 @@ public class ObjectIndex {
 		return(aNowStr + aNewStr);
 	}
 
-	public static void GetKeyValueForIndex(String[] aFullFieldName, int aFieldAt, Field finalField, Map<String, String> colMap, String eachColName) throws Exception {
+	public static void GetKeyValueForIndex(Connection aConn, String[] aFullFieldName, int aFieldAt, Field finalField, Map<String, String> colMap, String eachColName) throws Exception {
 		if (aFieldAt < aFullFieldName.length) {
 			String eachFieldName = aFullFieldName[aFieldAt];
-			if (finalField.getFieldType() == FieldType.OBJECT) {
-				Clasz clasz = ((FieldObject) finalField).getValueObj();
+			if (finalField.getDbFieldType() == FieldType.OBJECT) {
+				Clasz<?> clasz = ((FieldObject<?>) finalField).getValueObj(aConn);
 				if (clasz != null) {
 					if (clasz.fieldExist(eachFieldName)) {
 						finalField = clasz.getField(eachFieldName);
 					} else {
 						finalField = null;
 					}
-					GetKeyValueForIndex(aFullFieldName, aFieldAt + 1, finalField, colMap, eachColName);
+					GetKeyValueForIndex(aConn, aFullFieldName, aFieldAt + 1, finalField, colMap, eachColName);
 				}
-			} else if (finalField.getFieldType() == FieldType.OBJECTBOX) {
-				FieldObjectBox fobField = (FieldObjectBox) finalField;
-				for (Clasz eachClasz : fobField.getObjectMap().values()) { // now update/insert all member variable
+			} else if (finalField.getDbFieldType() == FieldType.OBJECTBOX) {
+				FieldObjectBox<?> fobField = (FieldObjectBox<?>) finalField;
+				for (Clasz<?> eachClasz : fobField.getObjectMap().values()) { // now update/insert all member variable
 					if (eachClasz.fieldExist(eachFieldName)) {
 						finalField = eachClasz.getField(eachFieldName);
-						GetKeyValueForIndex(aFullFieldName, aFieldAt + 1, finalField, colMap, eachColName);
+						GetKeyValueForIndex(aConn, aFullFieldName, aFieldAt + 1, finalField, colMap, eachColName);
 					} 
 				}
 			} else {
@@ -338,13 +330,13 @@ public class ObjectIndex {
 			}
 		} else { // already traverse to the end of the leaf field
 			if (finalField != null) {
-				if (finalField.getFieldType() == FieldType.OBJECT) {
-					if (finalField.getValueObj() != null) {
+				if (finalField.getDbFieldType() == FieldType.OBJECT) {
+					if (finalField.getValueObj(aConn) != null) {
 						colMap.put(eachColName, finalField.getValueStr()); // with the final field, place inside the map for later sql/jdbc update
 					} else {
 						colMap.put(eachColName, ""); // with the final field, place inside the map for later sql/jdbc update
 					}
-				} else if (finalField.getFieldType() == FieldType.OBJECTBOX) {
+				} else if (finalField.getDbFieldType() == FieldType.OBJECTBOX) {
 					throw new Hinderance("Cannot index on FieldObjectBox type at the leaf field!");
 				}
 			} else {
@@ -371,13 +363,13 @@ public class ObjectIndex {
 	}
 	*/
 
-	public static String CreateObjectOrFieldIndex(Connection aConn, Clasz aClasz, List<Field> colBox, String newName) throws Exception {
+	public static String CreateObjectOrFieldIndex(Connection aConn, Clasz<?> aClasz, List<Field> colBox, String newName) throws Exception {
 		if (Database.TableExist(aConn, newName) == false) {
 			Table indexTable = new Table(newName);
 			List<Field> phyIdxs = new CopyOnWriteArrayList<>();
 			for(Field eachField : colBox) { // get all the marked field for indexing from the object
 				String colName = Database.Java2DbFieldName(eachField.getFqName());
-				if (eachField.getFieldType() == FieldType.STRING) {
+				if (eachField.getDbFieldType() == FieldType.STRING) {
 					phyIdxs.add(indexTable.createField(colName, FieldType.STRING, eachField.getFieldSize()));
 				} else {
 					phyIdxs.add(indexTable.createField(colName, FieldType.STRING, String.valueOf(Long.MAX_VALUE).length()));
@@ -401,15 +393,15 @@ public class ObjectIndex {
 		return(newName);
 	}
 
-	public static String createObjectIndex(Connection aConn, Clasz aClasz) throws Exception {
+	public static String createObjectIndex(Connection aConn, Clasz<?> aClasz) throws Exception {
 		List<Field> colBox = aClasz.getAllIndexKey();
 		String newName = getObjectIndexName(aConn, aClasz, colBox);
 		String result = CreateObjectOrFieldIndex(aConn, aClasz, colBox, newName);
 		return(result);
 	}
 
-	public static String createFieldIndex(Connection aConn, Clasz aMasterClasz, String aFieldName) throws Exception {
-		Clasz childClasz = aMasterClasz.getValueObject(aFieldName);
+	public static String createFieldIndex(Connection aConn, Clasz<?> aMasterClasz, String aFieldName) throws Exception {
+		Clasz<?> childClasz = aMasterClasz.getNonNullObject(aConn, aFieldName);
 		List<Field> colBox = childClasz.getAllIndexKey();
 		String newName = GetFieldIndexName(aConn, aMasterClasz, aFieldName, colBox);
 		String result = CreateObjectOrFieldIndex(aConn, childClasz, colBox, newName);
@@ -456,7 +448,7 @@ public class ObjectIndex {
 		return(result);
 	}
 
-	public static boolean IsObjectIndexForClasz(Connection aConn, String aIndexName, Clasz aClasz) throws Exception {
+	public static boolean IsObjectIndexForClasz(Connection aConn, String aIndexName, Clasz<?> aClasz) throws Exception {
 		boolean result = false;
 		DatabaseMetaData mdb = aConn.getMetaData();
 		String[] onlyTable = { "TABLE" };
@@ -481,7 +473,7 @@ public class ObjectIndex {
 		return(result);
 	}
 
-	public static List<String> GetAllIndexName(Connection aConn, Clasz aClasz) throws Exception {
+	public static List<String> GetAllIndexName(Connection aConn, Clasz<?> aClasz) throws Exception {
 		List<String> result = new CopyOnWriteArrayList<>();
 		DatabaseMetaData mdb = aConn.getMetaData();
 		ResultSet rs;
@@ -496,12 +488,12 @@ public class ObjectIndex {
 		return(result);
 	}
 
-	public static String CreateIndexName(Clasz aClasz) {
+	public static String CreateIndexName(Clasz<?> aClasz) {
 		String result = Clasz.GetObjectIndexPrefix() + Database.Java2DbTableName(aClasz.getClass().getSimpleName());
 		return(result);
 	}
 
-	public static String getObjectIndexName(Connection aConn, Clasz aClasz, List<Field> colBox) throws Exception {
+	public static String getObjectIndexName(Connection aConn, Clasz<?> aClasz, List<Field> colBox) throws Exception {
 		String prefixName = Clasz.GetObjectIndexPrefix();
 		String allColName = "";
 		for(Field eachField : colBox) { // get all the marked field for indexing from the object
@@ -515,7 +507,7 @@ public class ObjectIndex {
 		return(idxName);
 	}
 
-	public static String GetFieldIndexName(Connection aConn, Clasz aMasterClasz, String aFieldName, List<Field> colBox) throws Exception {
+	public static String GetFieldIndexName(Connection aConn, Clasz<?> aMasterClasz, String aFieldName, List<Field> colBox) throws Exception {
 		String prefixName = Clasz.GetFieldIndexPrefix();
 		String allColName = "";
 		for(Field eachField : colBox) { // get all the marked field for indexing from the object
@@ -531,7 +523,7 @@ public class ObjectIndex {
 
 	public static boolean IsNumeric(String str)  {  
 		try  {  
-			double d = Double.parseDouble(str);  
+			Double.parseDouble(str);  
 		}  
 		catch(NumberFormatException nfe)  {  
 			return false;  
@@ -539,10 +531,10 @@ public class ObjectIndex {
 		return true;  
 	}
 
-	public static List<Field> GetIndexedField(Connection aConn, Clasz aClasz) throws Exception {
+	public static List<Field> GetIndexedField(Connection aConn, Clasz<?> aClasz) throws Exception {
 		List<Field> aryFieldObjId= new CopyOnWriteArrayList<>();
 		List<Field> aryFieldData = new CopyOnWriteArrayList<>();
-		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz, "");
+		GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz);
 		return(aryFieldData);
 	}
 
@@ -556,22 +548,22 @@ public class ObjectIndex {
 	}
 	*/
 
-	public static void GetCriteriaByTable(Clasz aCriteria, Map<String, Record> aWhereCriteria, String aFqFieldName) throws Exception {
-		GetCriteriaByTable(aCriteria, aWhereCriteria, null, aFqFieldName);
+	public static void GetCriteriaByTable(Connection aConn, Clasz<?> aCriteria, Map<String, Record> aWhereCriteria, String aFqFieldName) throws Exception {
+		GetCriteriaByTable(aConn, aCriteria, aWhereCriteria, null, aFqFieldName);
 	}
 
-	public static void GetCriteriaByTable(Clasz aCriteria, Map<String, Record> aWhereCriteria, Record aWhereRec, String aFqFieldName) throws Exception {
-		for (Field eachField : aCriteria.getRecord().getFieldBox().values()) { // for each populated field, build up the sql where clause
-			String fqName = GetFqFieldName(aFqFieldName, eachField.getFieldName());
+	public static void GetCriteriaByTable(Connection aConn, Clasz<?> aCriteria, Map<String, Record> aWhereCriteria, Record aWhereRec, String aFqFieldName) throws Exception {
+		for (Field eachField : aCriteria.getInstantRecord().getFieldBox().values()) { // for each populated field, build up the sql where clause
+			String fqName = GetFqFieldName(aFqFieldName, eachField.getDbFieldName());
 			if (eachField.isModified()) {
-				if (eachField.getFieldType() == FieldType.OBJECT) { // if field is of object type, traverse it
-					Clasz fieldObject = ((FieldObject) eachField).getObj(); // convert table type to Clasz type
+				if (eachField.getDbFieldType() == FieldType.OBJECT) { // if field is of object type, traverse it
+					Clasz<?> fieldObject = ((FieldObject<?>) eachField).getObj(); // convert table type to Clasz type
 					if (fieldObject.getClaszName().equals("Clasz") == false) {
-						GetCriteriaByTable(fieldObject, aWhereCriteria, null, fqName);
+						GetCriteriaByTable(aConn, fieldObject, aWhereCriteria, null, fqName);
 					}
-				} else if (eachField.getFieldType() == FieldType.OBJECTBOX) {
-					for(Clasz memberObject : ((FieldObjectBox) eachField).getObjectMap().values()) {
-						GetCriteriaByTable(memberObject, aWhereCriteria, null, fqName);
+				} else if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
+					for(Clasz<?> memberObject : ((FieldObjectBox<?>) eachField).getObjectMap().values()) {
+						GetCriteriaByTable(aConn, memberObject, aWhereCriteria, null, fqName);
 					}
 				} else {
 					Record whereRec;
@@ -580,28 +572,28 @@ public class ObjectIndex {
 					} else {
 						whereRec = aWhereRec; // FieldObjectBox, use back the same whereRec
 					}
-					eachField.setFieldName(fqName);
-					whereRec.createField(eachField);
-					whereRec.copyValue(eachField);
+					eachField.setDbFieldName(fqName);
+					whereRec.createField(aConn, eachField);
+					whereRec.copyValue(aConn, eachField);
 					aWhereCriteria.put(aCriteria.getTableName(), whereRec); // the objective is here, accumulate every where field for each clasz/table
 				}
 			}
 		}
 
 		if (ObjectBase.ParentIsNotAtClaszYet(aCriteria)) {
-			Clasz parentObject = aCriteria.getParentObjectByContext();
+			Clasz<?> parentObject = aCriteria.getParentObjectByContext();
 			if (parentObject != null && parentObject.getClass().equals(Clasz.class) == false) { // no parent clszObject because its an abstract class and no inherited normal class
 				if (aCriteria.isPopulated() == false) {
-					GetCriteriaByTable(aCriteria, aWhereCriteria, null, aFqFieldName);
+					GetCriteriaByTable(aConn, aCriteria, aWhereCriteria, null, aFqFieldName);
 				}
 			}
 		}
 	}
 
-	public static String GetIndexWhereCriteria(String aObjIdxName, String aFqFieldName, Clasz aCriteria, List<Field> aIndexField) throws Exception {
+	public static String GetIndexWhereCriteria(Connection aConn, String aObjIdxName, String aFqFieldName, Clasz<?> aCriteria, List<Field> aIndexField) throws Exception {
 		String strWhere = new String();
 		Map<String, Record> whereCriteria = new ConcurrentHashMap<>(); // each table name (string) and a record for the where fields (record)
-		GetCriteriaByTable(aCriteria, whereCriteria, aFqFieldName); // the select criteria for this leaf clszObject, doesn't do the parent clszObject
+		GetCriteriaByTable(aConn, aCriteria, whereCriteria, aFqFieldName); // the select criteria for this leaf clszObject, doesn't do the parent clszObject
 
 		// get list of indexed fields
 		int cntrTable = 0;
@@ -620,7 +612,7 @@ public class ObjectIndex {
 				if (eachRec.getFields().size() > 1) {
 					if (cntrField == 1) {
 						if (eachField.getFormulaStr().isEmpty()) {
-							strWhere += aObjIdxName + "." + eachField.getFieldName() + " in (?";
+							strWhere += aObjIdxName + "." + eachField.getDbFieldName() + " in (?";
 						} else {
 							strWhere += eachField.getFormulaStr() + " in (?";
 						}
@@ -629,7 +621,7 @@ public class ObjectIndex {
 					}
 				} else {
 					if (eachField.getFormulaStr().isEmpty()) {
-						strWhere += aObjIdxName + "." + eachField.getFieldName() + " = ?";
+						strWhere += aObjIdxName + "." + eachField.getDbFieldName() + " = ?";
 					} else {
 						strWhere += eachField.getFormulaStr();
 					}
@@ -645,8 +637,8 @@ public class ObjectIndex {
 		return(strWhere);
 	}
 
-	public static String ObjectIndexOnField(Connection aConn, Clasz aClaszMaster, String aFobName, String aIndexFieldName) throws Exception {
-		Clasz claszMaster = ObjectBase.CreateObject(aConn, aClaszMaster.getClass());
+	public static String ObjectIndexOnFob(Connection aConn, Clasz<?> aClaszMaster, String aFobName, String aIndexFieldName) throws Exception {
+		Clasz<?> claszMaster = ObjectBase.CreateObject(aConn, aClaszMaster.getClass());
 		claszMaster.clearAllIndexKey();
 		claszMaster.getFieldObjectBox(aFobName).setObjectKey(true);
 		claszMaster.getFieldObjectBox(aFobName).getMetaObj().getField(aIndexFieldName).setObjectKey(true);
@@ -660,8 +652,7 @@ public class ObjectIndex {
 		return(indexName);
 	}
 
-	public static String ObjectIndexOnField(Connection aConn, Clasz aClaszMaster, String aFobName, List<String> aFieldList) throws Exception {
-		Clasz claszMaster = ObjectBase.CreateObject(aConn, aClaszMaster.getClass());
+	public static String CreateIndexNameOnFob(Connection aConn, Clasz<?> claszMaster, String aFobName, List<String> aFieldList) throws Exception {
 		claszMaster.clearAllIndexKey();
 		for(String eachFieldName : aFieldList) {
 			claszMaster.getFieldObjectBox(aFobName).setObjectKey(true);
@@ -669,23 +660,55 @@ public class ObjectIndex {
 		}
 
 		String indexName = ObjectIndex.GetObjectIndexName(aConn, claszMaster);
+		return indexName;
+	}
+
+	public static String ObjectIndexOnFob(Connection aConn, Clasz<?> aClaszMaster, String aFobName, List<String> aFieldList) throws Exception {
+		//String indexName = ObjectIndex.GetObjectIndexName(aConn, claszMaster);
+		Clasz<?> claszMaster = ObjectBase.CreateObject(aConn, aClaszMaster.getClass());
+		String indexName = CreateIndexNameOnFob(aConn, claszMaster, aFobName, aFieldList);
 		if (Database.TableExist(aConn, indexName) == false) {
-			App.logInfo(aClaszMaster.getClass(), "Creating object index with composite fields for: " + aClaszMaster.getClass().getName() + ", on payslip employee's name");
+			App.logInfo(aClaszMaster.getClass(), "Creating object index with composite fields for: " + aClaszMaster.getClass().getSimpleName());
 			ObjectIndex.CreateObjectIndex(aConn, claszMaster); // create field index by name
 			ObjectIndex.ObjectIndexPopulate(aClaszMaster.getClass(), aConn, indexName);
 		}
-
 		return(indexName);
 	}
 
-	public static void ObjectIndexPopulate(Class aMasterClass, Connection aConn, String aIndexName) throws Exception {
-			App.logInfo(aMasterClass, "Populating object index: " + aIndexName + ", on its payslip employee name");
+	public static void ObjectIndexPopulate(Class<?> aMasterClass, Connection aConn, String aIndexName) throws Exception {
+			App.logInfo(aMasterClass, "Populating object index: " + aIndexName);
 			String sqlGetMaster = "select " + Clasz.CreatePkColName(aMasterClass) + " from " + Clasz.CreateTableName(aMasterClass);
-			Clasz.ForEachClasz(aConn, aMasterClass, sqlGetMaster, ((Connection conn1, Clasz clasz) -> {
-				ObjectIndex.UpdateIndex(conn1, clasz, aIndexName, true);
+			Clasz.ForEachClaszFreeType(aConn, aMasterClass, sqlGetMaster, (Connection bConn, Object aEachClasz) -> {
+				ObjectIndex.UpdateIndex(bConn, (Clasz<?>) aEachClasz, aIndexName, true);
 				return(true);
-			}));
-			App.logInfo(aMasterClass, "Completed populating employment object index: " + aIndexName);
+			});
+			App.logInfo(aMasterClass, "Completed populating object index: " + aIndexName);
+	}
+
+	public static void AddDataColumn2Index(Connection aConn, String aObjectIndexName, Clasz<?> aClasz2Index) throws Exception {
+		if (Database.TableExist(aConn, aObjectIndexName)) {
+			Table objectIndexTable = new Table(aObjectIndexName);
+
+			// traverse aClasz and get the key for indexsing
+			List<Field> aryFieldObjId = new CopyOnWriteArrayList<>();
+			List<Field> aryFieldData = new CopyOnWriteArrayList<>();
+			ObjectIndex.GetAllIndexKey(aryFieldObjId, aryFieldData, aClasz2Index);
+
+			// create the missing field
+			for (Field eachField : aryFieldData) {
+				// now create the data field for indexing
+				String colName = Database.Java2DbFieldName(eachField.getFqName());
+				if (eachField.getDbFieldType() == FieldType.STRING) {
+					objectIndexTable.createField(colName, FieldType.STRING, eachField.getFieldSize());
+				} else {
+					objectIndexTable.createField(colName, eachField.getDbFieldType());
+				}
+			}
+			// add missing column into db
+			Database.AddColumn(aConn, objectIndexTable);
+		} else {
+			App.logWarn(ObjectIndex.class, "Object index: " + aObjectIndexName + " already exist, will not add index column to it");
+		}
 	}
 }
 

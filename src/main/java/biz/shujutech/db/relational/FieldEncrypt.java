@@ -11,12 +11,12 @@ public class FieldEncrypt extends FieldStr {
 	private static final String DEFAULT_ENCRYPTING_KEY = "s2h0u1j7u0t6e1c8h";
 	private static final int MAX_KEY_SIZE = 16; // must be multiple of 8
 	private static final String ENCRYPTING_PROPERTY = "Systm.keyEncrypt";
-	private static final int MAX_ENCRYPTED_SIZE = 64; // should only need 43 bytes, https://stackoverflow.com/questions/13378815/base64-length-calculation
+	private static final int MAX_ENCRYPTED_SIZE = 64; // cannot determine blowfish result byte size, only can determine conversion to base64 size see https://stackoverflow.com/questions/13378815/base64-length-calculation
 	private static final int MAX_STR_SIZE = 32; // must be multiple of 8
 
 	public FieldEncrypt(String aName) {
 		super(aName, MAX_ENCRYPTED_SIZE);
-		this.setFieldType(FieldType.ENCRYPT);
+		this.setDbFieldType(FieldType.ENCRYPT);
 	}
 
 	@Override
@@ -33,6 +33,7 @@ public class FieldEncrypt extends FieldStr {
 
 	@Override
 	public void setValue(Object value) throws Exception {
+		this.setModified(true);
 		this.setValueStr((String) value); // must call this set method so setModified is call
 	}
 
@@ -42,10 +43,14 @@ public class FieldEncrypt extends FieldStr {
 
 	@Override
 	public void setValueStr(String value) throws Exception {
-		if (value.length() > MAX_STR_SIZE) throw new Hinderance("Encrypted field length cannot be more than " + MAX_STR_SIZE + " char");
-		String strKey = App.GetValue(ENCRYPTING_PROPERTY, DEFAULT_ENCRYPTING_KEY);
-		String encryptedValue = Encrypt(value, strKey);
-		super.setValueStr(encryptedValue);
+		if (value != null) {
+			if (value.length() > MAX_STR_SIZE) throw new Hinderance("Encrypted field length cannot be more than " + MAX_STR_SIZE + " char");
+			String strKey = App.GetValue(ENCRYPTING_PROPERTY, DEFAULT_ENCRYPTING_KEY);
+			String encryptedValue = Encrypt(value, strKey);
+			super.setValueStr(encryptedValue);
+		} else {
+			super.setValueStr(null);
+		}
 	}
 
 	public static byte[] Str2ByteOfSize(String aStr, int aMaxSize) throws Exception {

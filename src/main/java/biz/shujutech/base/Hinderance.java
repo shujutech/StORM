@@ -3,7 +3,7 @@
  * architectural for this is to enable classes coded by ourselves to 
  * throw their exceptions all the time. This classes are catch and 
  * thrown up to the root calling class that will then use the method 
- * exToStr() to display the error messages. Notice all the messages 
+ * ExToStr() to display the error messages. Notice all the messages 
  * from the error stack are displayed to facilitate error diagnosing. 
  * To preserve the stack messages, this classes store the messages in
  * a private variable.
@@ -18,7 +18,7 @@ import java.util.StringTokenizer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Hinderance extends Exception {
-	private ConcurrentLinkedQueue<String> exQueue = new ConcurrentLinkedQueue<String>();	// to preserve messages from the error stack
+	private ConcurrentLinkedQueue<String> exQueue = new ConcurrentLinkedQueue<>();	// to preserve messages from the error stack
 	private String javaExStr = "";
 	private static String lineFeed;
 
@@ -26,7 +26,7 @@ public class Hinderance extends Exception {
 		Hinderance.lineFeed = System.getProperty("line.separator");
 		Exception ex = new Exception();
 		ex.setStackTrace(Thread.currentThread().getStackTrace());
-		this.exQueue.add(aMsg + Hinderance.lineFeed + exToStr(ex));
+		this.exQueue.add(aMsg + Hinderance.lineFeed + Hinderance.ExToStr(ex));
 	}
 
 	public Hinderance(Throwable aEx) {
@@ -83,7 +83,7 @@ public class Hinderance extends Exception {
 		return(result);
 	}
 
-	public static String exToStr(Throwable aEx) {
+	public static String ExToStr(Throwable aEx) {
 		if (aEx.getClass().getName().equals(new Hinderance(new Throwable()).getClass().getName())) {
 			Hinderance Ex = (Hinderance) aEx;
 			return Ex.getExMsg();
@@ -93,7 +93,7 @@ public class Hinderance extends Exception {
 		}
 	}
 
-	public static String exToStr(Throwable aEx, String aMsg) {
+	public static String ExToStr(Throwable aEx, String aMsg) {
 		if (aEx.getClass().getName().equals(new Hinderance(new Throwable()).getClass().getName())) {
 			Hinderance Ex = (Hinderance) aEx;
 			return aMsg.concat(Hinderance.lineFeed).concat(Ex.getExMsg());
@@ -103,7 +103,7 @@ public class Hinderance extends Exception {
 		}
 	}
 
-	public static String exStackToStr(Throwable aEx, String aMsg) {
+	public static String ExStackToStr(Throwable aEx, String aMsg) {
 		String ReturnStr = aMsg.concat(Hinderance.lineFeed);
 
 		StringWriter sWriter = new StringWriter();

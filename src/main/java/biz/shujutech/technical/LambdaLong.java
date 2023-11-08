@@ -16,4 +16,8 @@ public class LambdaLong {
 		return(this.value);
 	}
 	
+	public Long increment() {
+		this.value = this.value + 1;
+		return(this.value);
+	}
 }

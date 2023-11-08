@@ -6,8 +6,8 @@ public class FieldFloat extends Field {
 	private Float valueFloat;
 
 	public FieldFloat(String aName) {
-		this.setFieldName(aName);
-		this.setFieldType(FieldType.FLOAT);
+		this.setDbFieldName(aName);
+		this.setDbFieldType(FieldType.FLOAT);
 	}
 
 	public Float getValueFloat() {
@@ -25,10 +25,12 @@ public class FieldFloat extends Field {
 		this.setValueFloat((Float) value);
 	}
 
+	/*
 	@Override
 	public Object getValueObj() {
 		return(valueFloat);
 	}
+	*/
 
 	@Override
 	public Object getValueObj(Connection aConn) {

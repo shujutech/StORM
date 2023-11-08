@@ -6,8 +6,8 @@ import biz.shujutech.base.Connection;
 import biz.shujutech.base.Hinderance;
 import biz.shujutech.db.object.Clasz;
 import biz.shujutech.db.object.FieldHtml;
+import biz.shujutech.db.object.FieldObject;
 import biz.shujutech.db.object.FieldObjectBox;
-import biz.shujutech.db.object.ObjectBase;
 import biz.shujutech.reflect.AttribIndex;
 import java.sql.ResultSet;
 import java.util.Base64;
@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.joda.time.DateTime;
 
-public class Field extends Base implements Comparable {
-	public static final Long BASE64_MAXSIZE = 200000L;
+public class Field extends Base implements Comparable<Field> {
+	public static final Long BASE64_MAXSIZE = 2097152L;
 
 	private String fieldName;
 	private FieldType fieldType;
@@ -66,7 +66,7 @@ public class Field extends Base implements Comparable {
 
 	public List<AttribIndex> indexes = new CopyOnWriteArrayList<>();
 
-	private Clasz masterObject = null;
+	private Clasz<?> masterObject = null;
 
 	private String fieldMask = "";
 
@@ -91,7 +91,7 @@ public class Field extends Base implements Comparable {
 	}
 
 	public static Field CreateField(Field aField) throws Exception {
-		Field result = CreateFieldByType(aField.getFieldName(), aField.getFieldType(), aField.getFieldSize());
+		Field result = CreateFieldByType(aField.getDbFieldName(), aField.getDbFieldType(), aField.getFieldSize());
 		return(result);
 	}
 
@@ -109,13 +109,27 @@ public class Field extends Base implements Comparable {
 		}
 	}
 
-	public static Field CreateField(String aName, DateTime aValue) throws Exception {
+	/*
+	private static Field CreateField(String aName, DateTime aValue) throws Exception {
 		FieldDate result = (FieldDate) CreateFieldByType(aName, FieldType.DATE, 0);
 		result.setValueDate(aValue);
 		return(result);
 	}
 
-	public static Field CreateField(String aName, DateTime aValue, boolean useTime) throws Exception {
+	private static Field CreateField(String aName, DateTime aValue, boolean useTime) throws Exception {
+		FieldDateTime result = (FieldDateTime) CreateFieldByType(aName, FieldType.DATETIME, 0);
+		result.setValueDateTime(aValue);
+		return(result);
+	}
+	*/
+
+	public static FieldDate CreateFieldDate(String aName, DateTime aValue) throws Exception {
+		FieldDate result = (FieldDate) CreateFieldByType(aName, FieldType.DATE, 0);
+		result.setValueDate(aValue);
+		return(result);
+	}
+
+	public static FieldDateTime CreateFieldDateTime(String aName, DateTime aValue) throws Exception {
 		FieldDateTime result = (FieldDateTime) CreateFieldByType(aName, FieldType.DATETIME, 0);
 		result.setValueDateTime(aValue);
 		return(result);
@@ -144,15 +158,23 @@ public class Field extends Base implements Comparable {
 			result = (Field) new FieldDate(fieldName);
 		} else if (aType == FieldType.FLOAT) {
 			result = (Field) new FieldFloat(fieldName);
+		} else if (aType == FieldType.RECORD) {
+			result = (Field) new FieldRecord(fieldName);
 		} else {
 			throw new Hinderance("Fail to create field of unknown type, field: " + fieldName.toUpperCase() + ", type: " + aType);
 		}
 		return(result);
 	}
 
+	public String getCamelCaseName() {
+		String result = getDisplayName();
+		result = result.replaceAll(" ", "");
+		return result;
+	}
+
 	public String getDisplayName() {
 		if (this.displayName.isEmpty()) {
-			String tmp = this.getFieldName();
+			String tmp = this.getDbFieldName();
 			tmp = tmp.replace("_", " ");
 			tmp = capitalizeString(tmp);
 			displayName = tmp;
@@ -296,8 +318,9 @@ public class Field extends Base implements Comparable {
 		this.fieldSize = fieldSize;
 	}
 
+	//@Deprecated
 	public String getValueStr() throws Exception {
-		throw new Hinderance("The getValueStr method is not implemented in class: " + this.getMasterClassSimpleName() + ", fieid: "+ this.getFieldName());
+		throw new Hinderance("The getValueStr method is not implemented in class: " + this.getMasterClassSimpleName() + ", fieid: "+ this.getDbFieldName());
 	}
 
 	public String getValueStr(Connection aConn) throws Exception {
@@ -305,38 +328,43 @@ public class Field extends Base implements Comparable {
 	}
 
 	public void setValue(Object value) throws Exception {
-		throw new Hinderance("The setValue method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getFieldName());
+		throw new Hinderance("The setValue method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getDbFieldName());
 	}
 
 	public void setValueStr(String value) throws Exception {
-		throw new Hinderance("The setValueStr method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getFieldName());
+		throw new Hinderance("The setValueStr method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getDbFieldName());
 	}
 
+	/*
 	public Object getValueObj(ObjectBase aDb) throws Exception {
 		throw new Hinderance("The getValueObj(ObjectBase) method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getFieldName());
 	}
+	*/
 
 	public Object getValueObj(Connection aConn) throws Exception {
-		throw new Hinderance("The getValueObj(Connection) method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getFieldName());
+		throw new Hinderance("The getValueObj(Connection) method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getDbFieldName());
 	}
 
+	/*
+	@Deprecated
 	public Object getValueObj() throws Exception {
 		throw new Hinderance("The getValueObj() method is not implemented in class: " + this.getMasterClassSimpleName() + ", field: "+ this.getFieldName());
 	}
+	*/
 
-	public String getFieldName() {
+	public String getDbFieldName() {
 		return fieldName;
 	}
 
-	public final void setFieldName(String fieldName) {
+	public final void setDbFieldName(String fieldName) {
 		this.fieldName = fieldName;
 	}
 
-	public FieldType getFieldType() {
+	public FieldType getDbFieldType() {
 		return fieldType;
 	}
 
-	public final void setFieldType(FieldType fieldType) {
+	public final void setDbFieldType(FieldType fieldType) {
 		this.fieldType = fieldType;
 	}
 
@@ -346,52 +374,53 @@ public class Field extends Base implements Comparable {
 
 	public void setFormulaStr(String formulaStr) {
 		this.formulaStr = formulaStr;
+		this.setModified(true);
 	}
 
 	public void populateField(ResultSet rs) throws Exception {
 		PopulateField(this, rs);
 	}
 
-	public static void PopulateField(Field eachField, ResultSet rs) throws Exception {
-		if (eachField.getFieldType() == FieldType.STRING || eachField.getFieldType() == FieldType.HTML) {
-			String value = rs.getString(eachField.getFieldName());
+	public static void PopulateField(Field eachField, ResultSet aRs) throws Exception {
+		if (eachField.getDbFieldType() == FieldType.STRING || eachField.getDbFieldType() == FieldType.HTML) {
+			String value = aRs.getString(eachField.getDbFieldName());
 			((FieldStr) eachField).setValueStr(value);
-		} else if (eachField.getFieldType() == FieldType.ENCRYPT) {
-			String value = rs.getString(eachField.getFieldName());
+		} else if (eachField.getDbFieldType() == FieldType.ENCRYPT) {
+			String value = aRs.getString(eachField.getDbFieldName());
 			((FieldEncrypt) eachField).setEncryptedValue(value);
-		} else if (eachField.getFieldType() == FieldType.BASE64) {
-			byte[] byteArray = rs.getBytes(eachField.getFieldName());
+		} else if (eachField.getDbFieldType() == FieldType.BASE64) {
+			byte[] byteArray = aRs.getBytes(eachField.getDbFieldName());
 			if (byteArray != null) {
 				if (byteArray.length > Field.BASE64_MAXSIZE) {
-					throw new Hinderance("Field BASE64 size exceed: " + BASE64_MAXSIZE + " bytes, field: " + eachField.getFieldName());
+					throw new Hinderance("Field BASE64 size exceed: " + BASE64_MAXSIZE + " bytes, field: " + eachField.getDbFieldName());
 				}
 				String value = Base64.getEncoder().encodeToString(byteArray);
 				value = new String(Base64.getDecoder().decode(value));
 				((FieldStr) eachField).setValueStr(value);
 			}
-		} else if (eachField.getFieldType() == FieldType.DATETIME) {
+		} else if (eachField.getDbFieldType() == FieldType.DATETIME) {
 			FieldDateTime fieldDate = (FieldDateTime) eachField;
-			java.sql.Timestamp tstampType = rs.getTimestamp(fieldDate.getFieldName());
+			java.sql.Timestamp tstampType = aRs.getTimestamp(fieldDate.getDbFieldName());
 			if (tstampType != null) {
 				DateTime value = new DateTime(tstampType.getTime());
 				fieldDate.setValueDateTime(value);
 			} else {
 				fieldDate.setValueDateTime(null);
 			}
-		} else if (eachField.getFieldType() == FieldType.DATE) {
+		} else if (eachField.getDbFieldType() == FieldType.DATE) {
 			FieldDate fieldDate = (FieldDate) eachField;
-			java.sql.Date tstampType = rs.getDate(fieldDate.getFieldName());
+			java.sql.Date tstampType = aRs.getDate(fieldDate.getDbFieldName());
 			if (tstampType != null) {
 				DateTime value = new DateTime(tstampType.getTime());
 				fieldDate.setValueDate(value);
 			} else {
 				fieldDate.setValueDate(null);
 			}
-		} else	if (eachField.getFieldType() == FieldType.LONG) {
+		} else	if (eachField.getDbFieldType() == FieldType.LONG) {
 			FieldLong fieldLong = (FieldLong) eachField;
-			if (rs.getObject(eachField.getFieldName()) != null) {
-				Long value = rs.getLong(fieldLong.getFieldName());
-				if (rs.wasNull() == false) {
+			if (aRs.getObject(eachField.getDbFieldName()) != null) {
+				Long value = aRs.getLong(fieldLong.getDbFieldName());
+				if (aRs.wasNull() == false) {
 					fieldLong.setValueLong(value);
 				} else {
 					fieldLong.setValueLong(null);
@@ -399,75 +428,76 @@ public class Field extends Base implements Comparable {
 			} else {
 				fieldLong.setValueLong(null);
 			}
-		} else	if (eachField.getFieldType() == FieldType.INTEGER) {
-			Integer value = rs.getInt(eachField.getFieldName());
-			if (rs.wasNull() == false) {
+		} else	if (eachField.getDbFieldType() == FieldType.INTEGER) {
+			Integer value = aRs.getInt(eachField.getDbFieldName());
+			if (aRs.wasNull() == false) {
 				((FieldInt) eachField).setValueInt(value);
 			} else {
 				((FieldInt) eachField).setValueInt(null);
 			}
-		} else	if (eachField.getFieldType() == FieldType.FLOAT) {
-			Float value = rs.getFloat(eachField.getFieldName());
-			if (rs.wasNull() == false) {
+		} else	if (eachField.getDbFieldType() == FieldType.FLOAT) {
+			Float value = aRs.getFloat(eachField.getDbFieldName());
+			if (aRs.wasNull() == false) {
 				((FieldFloat) eachField).setValueFloat(value);
 			} else {
 				((FieldFloat) eachField).setValueFloat(null);
 			}
-		} else	if (eachField.getFieldType() == FieldType.BOOLEAN) {
-			Boolean value = rs.getBoolean(eachField.getFieldName());
+		} else	if (eachField.getDbFieldType() == FieldType.BOOLEAN) {
+			Boolean value = aRs.getBoolean(eachField.getDbFieldName());
 			((FieldBoolean) eachField).setValueBoolean(value);
 		} else {
-			throw new Hinderance("Unknown type for field: " + eachField.getFieldName().toUpperCase() + " when attempting to fetch it from result set");
+			throw new Hinderance("Unknown type for field: " + eachField.getDbFieldName().toUpperCase() + " when attempting to fetch it from result set");
 		}
 		eachField.setModified(false); // when populating database, its assume is not modify
 	}
 
 
-	public void cloneField(Field aSourceField) throws Exception {
-		this.copyValue(aSourceField);
+	public void cloneField(Connection aConn, Field aSourceField) throws Exception {
+		this.copyValue(aConn, aSourceField);
 		this.setModified(aSourceField.isModified()); // place back the original modify status
 	}
 
-	public void copyValueStrNull(Field aSourceField) throws Exception {
-		if (this.getFieldType() == FieldType.STRING || this.getFieldType() == FieldType.HTML) {
+	public void copyValueStrNull(Connection aConn, Field aSourceField) throws Exception {
+		if (this.getDbFieldType() == FieldType.STRING || this.getDbFieldType() == FieldType.HTML) {
 			String value = ((FieldStr) aSourceField).getValueStrNull();
 			this.setFieldSize(aSourceField.getFieldSize());
 			((FieldStr) this).setValueStr(value);
 		} else {
-			copyValue(aSourceField);
+			copyValue(aConn, aSourceField);
 		}
 	}
 
-	public void copyValue(Field aSourceField) throws Exception {
-		if (this.getFieldType() == FieldType.STRING || this.getFieldType() == FieldType.HTML) {
+	public void copyValue(Connection aConn, Field aSourceField) throws Exception {
+		if (this.getDbFieldType() == FieldType.STRING || this.getDbFieldType() == FieldType.HTML) {
 			String value = ((FieldStr) aSourceField).getValueStrNull();
 			this.setFieldSize(aSourceField.getFieldSize());
 			((FieldStr) this).setValueStr(value);
-		} else	if (this.getFieldType() == FieldType.ENCRYPT) {
+		} else	if (this.getDbFieldType() == FieldType.ENCRYPT) {
 			String value = ((FieldEncrypt) aSourceField).getValueStr();
 			((FieldEncrypt) this).setValueStr(value);
-		} else	if (this.getFieldType() == FieldType.BASE64) {
-			String value = ((FieldEncrypt) aSourceField).getValueStr();
-			((FieldEncrypt) this).setValueStr(value);
-		} else if (this.getFieldType() == FieldType.DATETIME) {
+		} else	if (this.getDbFieldType() == FieldType.BASE64) {
+			String value = ((FieldBase64) aSourceField).getValueStr();
+			((FieldBase64) this).setValueStr(value);
+		} else if (this.getDbFieldType() == FieldType.DATETIME) {
 			DateTime value = ((FieldDateTime) aSourceField).getValueDateTime();
 			((FieldDateTime) this).setValueDateTime(value);
-		} else if (this.getFieldType() == FieldType.DATE) {
+		} else if (this.getDbFieldType() == FieldType.DATE) {
 			DateTime value = ((FieldDate) aSourceField).getValueDate();
 			((FieldDate) this).setValueDate(value);
-		} else	if (this.getFieldType() == FieldType.LONG) {
+		} else	if (this.getDbFieldType() == FieldType.LONG) {
 			Long value = ((FieldLong) aSourceField).getValueLong();
 			((FieldLong) this).setValueLong(value);
-		} else	if (this.getFieldType() == FieldType.INTEGER) {
+		} else	if (this.getDbFieldType() == FieldType.INTEGER) {
 			Integer value = ((FieldInt) aSourceField).getValueInt();
 			((FieldInt) this).setValueInt(value);
-		} else	if (this.getFieldType() == FieldType.FLOAT) {
+		} else	if (this.getDbFieldType() == FieldType.FLOAT) {
 			Float value = ((FieldFloat) aSourceField).getValueFloat();
-		} else	if (this.getFieldType() == FieldType.BOOLEAN) {
+			((FieldFloat) this).setValueFloat(value);
+		} else	if (this.getDbFieldType() == FieldType.BOOLEAN) {
 			Boolean value = ((FieldBoolean) aSourceField).getValueBoolean();
 			((FieldBoolean) this).setValueBoolean(value);
 		} else {
-			throw new Hinderance("Unknown type for field when attempting to copy from field: " + aSourceField.getFieldName().toUpperCase());
+			throw new Hinderance("Unknown type for field when attempting to copy from field: " + aSourceField.getDbFieldName().toUpperCase());
 		}
 		this.copyAttribute(aSourceField);
 	}
@@ -487,18 +517,6 @@ public class Field extends Base implements Comparable {
 		this.primaryKeySeq = aSourceField.primaryKeySeq;
 		this.masterObject = aSourceField.masterObject;
 		this.displayName = aSourceField.displayName;
-		/*
-		this.displayPosition(aSourceField.displayPosition());
-		this.setUiMaster(aSourceField.getUiMaster());
-		this.setLookup(aSourceField.lookup());
-		this.setUpdateable(aSourceField.isUpdateable());
-		this.setPolymorphic(aSourceField.isPolymorphic());
-		if (aSourceField.isUniqueKey()) {
-			this.setPrimaryKey(aSourceField.getPrimaryKeySeq());
-		}
-		this.setMasterObject(aSourceField.getMasterObject());
-		this.setDisplayName(aSourceField.getDisplayName());
-		*/
 	}
 	
 	public boolean isSystemField() {
@@ -519,34 +537,24 @@ public class Field extends Base implements Comparable {
 		//if (left.getFieldType() == FieldType.STRING) {
 		if (left instanceof FieldStr) {
 			result = ((FieldStr) left).getValueStr().toLowerCase().compareTo(((FieldStr) right).getValueStr().toLowerCase());
-		} else if (left.getFieldType() == FieldType.DATETIME) {
+		} else if (left.getDbFieldType() == FieldType.DATETIME) {
 			result = ((FieldDateTime) left).getValueDateTime().compareTo(((FieldDateTime) right).getValueDateTime());
-		} else if (left.getFieldType() == FieldType.DATE) {
+		} else if (left.getDbFieldType() == FieldType.DATE) {
 			result = ((FieldDate) left).getValueDate().compareTo(((FieldDate) right).getValueDate());
-		} else	if (left.getFieldType() == FieldType.LONG) {
+		} else	if (left.getDbFieldType() == FieldType.LONG) {
 			result = (int) (((FieldLong) left).getValueLong() - ((FieldLong) right).getValueLong());
-		} else	if (left.getFieldType() == FieldType.INTEGER) {
+		} else	if (left.getDbFieldType() == FieldType.INTEGER) {
 			result = (int) (((FieldInt) left).getValueInt() - ((FieldInt) right).getValueInt());
 		}
-
-		/*
-		if (result == 0) {
-			result = 1; // returning 0 would merge keys??? http://stackoverflow.com/questions/109383/how-to-sort-a-mapkey-value-on-the-values-in-java
-		}
-
-		if (aLeft.getSortOrder() == SortOrder.DSC) {
-			result = result * -1;
-		}
-		*/
 		
 		return(result);
 	}
 
 	@Override
-	public int compareTo(Object aRight) {
+	public int compareTo(Field aRight) {
 		int result = 0;
 		try {
-			result = (Field.compare(this, (Field) aRight));
+			result = (Field.compare(this, aRight));
 		} catch(Exception ex) {
 			App.logEror(ex);
 		}
@@ -558,46 +566,53 @@ public class Field extends Base implements Comparable {
 		Integer compareInt = -1;
 		if (this instanceof FieldStr) {
 			compareInt = ((FieldStr) this).getValueStr().compareTo(((FieldStr) right).getValueStr());
-		} else if (this.getFieldType() == FieldType.DATETIME) {
+		} else if (this.getDbFieldType() == FieldType.DATETIME) {
 			compareInt = ((FieldDateTime) this).getValueDateTime().compareTo(((FieldDateTime) right).getValueDateTime());
-		} else if (this.getFieldType() == FieldType.DATE) {
+		} else if (this.getDbFieldType() == FieldType.DATE) {
 			compareInt = ((FieldDate) this).getValueDate().compareTo(((FieldDate) right).getValueDate());
-		} else	if (this.getFieldType() == FieldType.LONG) {
+		} else	if (this.getDbFieldType() == FieldType.LONG) {
 			compareInt = (int) (((FieldLong) this).getValueLong() - ((FieldLong) right).getValueLong());
-		} else	if (this.getFieldType() == FieldType.INTEGER) {
+		} else	if (this.getDbFieldType() == FieldType.INTEGER) {
 			compareInt = (int) (((FieldInt) this).getValueInt() - ((FieldInt) right).getValueInt());
-		} else	if (this.getFieldType() == FieldType.OBJECT) {
-			Clasz claszCriteria = (Clasz) this.getValueObj(aConn);
-			Clasz claszReal = (Clasz) (aRight).getValueObj(aConn);
+		} else	if (this instanceof FieldObject<?>) {
+			Clasz<?> claszCriteria = ((FieldObject<?>) this).getValueObj(aConn);
+			Clasz<?> claszReal = ((FieldObject<?>) aRight).getValueObj(aConn);
 			compareInt = claszCriteria.compareForCriteria(aConn, claszReal);
-		} else	if (this.getFieldType() == FieldType.OBJECTBOX) {
-			FieldObjectBox fobCriteria = (FieldObjectBox) this;
-			FieldObjectBox fobReal = (FieldObjectBox) aRight;
-			if (fobCriteria.getTotalMember() != fobReal.getTotalMember()) {
-				compareInt = (int) (fobCriteria.getTotalMember() - fobReal.getTotalMember());
+		} else	if (this instanceof FieldObjectBox<?>) {
+			@SuppressWarnings("unchecked")
+			FieldObjectBox<Clasz<?>> fobCriteria = (FieldObjectBox<Clasz<?>>) this; // can't use Tf? 
+			@SuppressWarnings("unchecked")
+			FieldObjectBox<Clasz<?>> fobReal = (FieldObjectBox<Clasz<?>>) aRight;
+			if (fobCriteria.getTotalMemberInList() != fobReal.getTotalMemberInList()) {
+				compareInt = (int) (fobCriteria.getTotalMemberInList() - fobReal.getTotalMemberInList());
 			} else {
 				List<Integer> compareNum = new CopyOnWriteArrayList<>();
-				fobCriteria.forEachMember(aConn, ((Connection bConn, Clasz aCriteriaMember) -> { 
+				fobCriteria.forEachMember(aConn, (Connection bConn, Clasz<?> aCriteriaMember) -> { 
 					List<Integer> gotMatch = new CopyOnWriteArrayList<>();
 					List<Integer> compareList = new CopyOnWriteArrayList<>();
-					fobReal.forEachMember(bConn, ((Connection cConn, Clasz aRealMember) -> { 
-						if (aCriteriaMember.equalsCriteria(cConn, aRealMember)) {
-							gotMatch.add(0);
-							return(false);
-						} else {
-							if (compareList.isEmpty()) {
-								int cmpInt = aCriteriaMember.compareForCriteria(cConn, aRealMember); // match the compare int for the first element that do not compare to 0
-								compareList.add(cmpInt);
+					fobReal.forEachMember(bConn, (Connection cConn, Clasz<?> aRealMember) -> {
+							try {
+								if ((aCriteriaMember).equalsCriteria(cConn, aRealMember)) {
+									gotMatch.add(0);
+									return(false);
+								} else {
+									if (compareList.isEmpty()) {
+										int cmpInt = (aCriteriaMember).compareForCriteria(cConn, aRealMember); // match the compare int for the first element that do not compare to 0
+										compareList.add(cmpInt);
+									}
+								}
+								return(true); 
+
+							} catch(Exception ex) {
+								throw new Hinderance(ex, "Fail, exception thrown in Field.comapreForCriteria method.");
 							}
-						}
-						return(true); 
-					}));
+						});
 					if (gotMatch.isEmpty()) {
 						compareNum.add(compareList.get(0));
 						return(false);
 					}
 					return(true);
-				}));
+				});
 				if (compareNum.isEmpty()) {
 					compareInt = 0;
 				} else {
@@ -605,7 +620,7 @@ public class Field extends Base implements Comparable {
 				}
 			}
 		} else {
-			throw new Hinderance("Unsupported criteria comparison for field of type: " + this.getFieldType().name());
+			throw new Hinderance("Unsupported criteria comparison for field of type: " + this.getDbFieldType().name());
 		}
 
 		return(compareInt);
@@ -777,19 +792,19 @@ public class Field extends Base implements Comparable {
 		this.fqName = fqName;
 	}
 
-	public Clasz getMasterObject() {
+	public Clasz<?> getMasterObject() {
 		return masterObject;
 	}
 
-	public Class getMasterClass() {
-		Class result = null;
+	public Class<?> getMasterClass() {
+		Class<?> result = null;
 		if (this.getMasterObject() != null) {
 			result = this.getMasterObject().getClass();
 		}
 		return(result);
 	}
 
-	public void setMasterObject(Clasz masterObject) {
+	public void setMasterObject(Clasz<?> masterObject) {
 		this.masterObject = masterObject;
 	}
 

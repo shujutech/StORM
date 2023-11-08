@@ -5,6 +5,7 @@
  */
 package biz.shujutech.base;
 
+import biz.shujutech.db.object.ObjectBase;
 import biz.shujutech.db.relational.BaseDb;
 import java.sql.Array;
 import java.sql.Blob;
@@ -43,6 +44,13 @@ public class Connection implements java.sql.Connection {
 
 	public BaseDb getBaseDb() {
 		return baseDb;
+	}
+
+	public ObjectBase getObjectDb() throws Exception {
+		if (baseDb instanceof ObjectBase)
+			return (ObjectBase) baseDb;
+		else
+			throw new Hinderance("Attempting to get wrong database type, connection is not instantiated by ObjectBase");
 	}
 
 	public void setBaseDb(BaseDb baseDb) {

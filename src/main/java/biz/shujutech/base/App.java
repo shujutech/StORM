@@ -74,17 +74,19 @@ public class App {
 	public static int MaxThread = 5;
 
 	public static String KeyClassLogging = "Systm.logClass";
-	public static ConcurrentHashMap<String, Level> ClassLogging = new ConcurrentHashMap<String, Level>();
+	public static ConcurrentHashMap<String, Level> ClassLogging = new ConcurrentHashMap<>();
 	public static int MAX_CLASS_LOGGING = 5;
 
 	public static Level JavaLogLevel = Level.ALL;
 
 	public static final String ERROR_COMPLAIN = ", please contact: &nbsp<a href='mailto:shujutech@gmail.com'>shujutech@gmail.com</a>";
-	public static final String CONTACT_US = "&nbsp <a href='mailto:shujutech@gmail.com'>shujutech@gmail.com</a>";
+	public static final String CONTACT_US = " <a href='mailto:shujutech@gmail.com'>shujutech@gmail.com</a>";
 	public static final String PATH_JAR = NormalizePath(App.class.getProtectionDomain().getCodeSource().getLocation().getPath());
 	public static final String PATH_DOCROOT = GetDocRoot(PATH_JAR);
-	public static final String PATH_HTML = PATH_DOCROOT;
-	public static final String PATH_WEBINF = PATH_DOCROOT + File.separator + "WEB-INF";
+	public static final String PATH_MAVEN_WEBAPP = "src/main/webapp";
+	public static String PATH_RESOURCES = "resources";
+	public static String PATH_HTML = null;
+	public static String PATH_WEBINF = PATH_DOCROOT + File.separator + "WEB-INF";
 	public static String LogPathWebInf = PATH_WEBINF + File.separator +  "log";
 	public static String ConfigPathWebInf = PATH_WEBINF + File.separator + "config";
 
@@ -112,6 +114,7 @@ public class App {
 		String logLevel = App.GetValue("Systm.logLevel", "INFO");
 		App.setLogLevel(logLevel);
 
+		App.logInfo("HTML base path: " + App.PATH_HTML);
 		App.logInfo("Working directory: " + System.getProperty("user.dir"));
 		App.logInfo("Configuration from: " + GetPropFullName(strPropFile));
 		App.logInfo("Log file: " + GetLogFullName(App.PropLogName));
@@ -119,10 +122,10 @@ public class App {
 		App.logInfo("Log next switch at: " + App.SwitchDateAfter);
 		App.logInfo("Maximum thread: " + GetMaxThread());
 
-		for (Entry entry : App.ClassLogging.entrySet()) {
+		for (Entry<String, Level> entry : App.ClassLogging.entrySet()) {
 			// for each of the table in the inheritance tree
-			String className = (String) entry.getKey();
-			Level level = (Level) entry.getValue();
+			String className = entry.getKey();
+			Level level = entry.getValue();
 			App.logInfo("Class logging enable at class: " + className + ", log level: " + App.logLevel2Str(level));
 		}
 
@@ -139,21 +142,35 @@ public class App {
 		}	
 	}
 
-	public static File FindFileOnWebInf(String aFileName) throws Exception {
+	public static File FindFileOnWebInfDir(String aFileName) throws Exception {
 		File result = Generic.FindFileInSubDirectory(PATH_WEBINF, aFileName);
-		if (result != null && result.exists()) {
-			return(result);
+		if (result != null) {
+			if (result.exists() == false) {
+				App.logEror("There is no such file: " + aFileName + " in WEB-INF directory: " + result.getAbsolutePath());
+			}
 		} else {
-			return(null);
+			App.logEror("Attempting to find: " + aFileName + " in WEB-INF directory with null value!");
 		}
+		return result;
 	}
 
-	public static void Setup(int aThreadId, String aPropsFile, boolean aOnlyConsoleLog) throws Exception {
+	public static void Setup(int aThreadId, String aPropsFileName, boolean aOnlyConsoleLog) throws Exception {
 		if (App.AlreadySetup) return;
 
+		// if PATH_HTML is null, value not set yet, if not null, Main.class have set this value
+		if (App.PATH_HTML == null) {
+			App.PATH_HTML = App.PATH_DOCROOT; 
+		} else {
+			//PATH_RESOURCES = "";
+			PATH_WEBINF = PATH_HTML + File.separator + "WEB-INF";
+			LogPathWebInf = PATH_WEBINF + File.separator +  "log";
+			ConfigPathWebInf = PATH_WEBINF + File.separator + "config";
+		}
+
 		// print the following compulsory to console
-		String propFullName = GetPropFullName(aPropsFile);
+		String propFullName = GetPropFullName(aPropsFileName);
 		App.logInfo("Configuration is from: " + propFullName);
+		App.logInfo("HTML base path: " + App.PATH_HTML);
 		App.logInfo("Working directory: " + System.getProperty("user.dir"));
 		App.logInfo("If log path is not specify, it will be defaulted to: " + System.getProperty("java.io.tmpdir"));
 		App.logInfo("Java classpath: " + System.getProperty("java.class.path"));
@@ -173,10 +190,11 @@ public class App {
 			App.LineFeed = "\r\n";
 		}
 		App.DateStyleObj = DateTimeFormat.forPattern(DATE_STYLE_STR);
-		App.PropertyFileName = aPropsFile;
 		App.NfThreadId = NumberFormat.getInstance();
 
 		if (App.AppProps == null) { // create or open properties file
+			App.InitAppProps(aPropsFileName);
+			/*
 			File propsFile = new File(propFullName);
 			if (propsFile.exists() == false) { // if no property file, create one
 				System.out.println("Fail to locate property file: " + propFullName + ", creating it....");
@@ -189,6 +207,7 @@ public class App {
 			propsInStream = new FileInputStream(propFullName);
 			AppProps = new Properties();
 			AppProps.load(propsInStream);
+			*/
 		}
 
 		if (App.AppLogger == null) { // with the properties we can open the log file 
@@ -310,7 +329,10 @@ public class App {
 		int startAt = aFileName.indexOf("WEB-INF");
 		if (startAt >= 0) {
 			result = aFileName.substring(0, startAt - 1);
-		} 
+		} else {
+			File docRootFile = new File(aFileName).getParentFile();
+			result = docRootFile.getAbsolutePath() + File.separator + "webapp"; // if jar locacation base path, no WEB-INF, we assume jar is in subdirectory
+		}
 		return(result);
 	}
 
@@ -338,38 +360,25 @@ public class App {
 	}
 
 	public static String GetPropFullName(String aPropsFile) throws Exception {
-		File propFile = Generic.FindFileAtUserDir(aPropsFile);
+		File propFile = Generic.FindFileAtStartupJarDir(aPropsFile);
 		if (propFile == null) {
-			App.logInfo("Property file: " + aPropsFile + ", is not in working directory: " + System.getProperty("user.dir"));
-			propFile = FindFileOnWebInf(aPropsFile);
+			App.logInfo("Property file: " + aPropsFile + ", is not in startup jar directory: " + Generic.GetStartupJarLocation());
+			propFile = Generic.FindFileAtRunFromDir(aPropsFile);
 			if (propFile == null) {
-				App.logInfo("Property file: " + aPropsFile + ", is not in WEB-INF: " + PATH_WEBINF);
-				propFile = Generic.FindFileOnClassPath(aPropsFile);
+				App.logInfo("Property file: " + aPropsFile + ", is not in 'run from' directory: " + System.getProperty("user.dir"));
+				propFile = FindFileOnWebInfDir(aPropsFile);
 				if (propFile == null) {
-					App.logInfo("Property file: " + aPropsFile + ", is not in any classpath sub-directories: " + System.getProperty("java.class.path"));
-					throw new Hinderance("Fail to locate property file: " + aPropsFile);
-				} 
-			}
-		} 
+					App.logInfo("Property file: " + aPropsFile + ", is not in WEB-INF directory: " + PATH_WEBINF);
+					propFile = Generic.FindFileOnClassPath(aPropsFile);
+					if (propFile == null) {
+						App.logInfo("Property file: " + aPropsFile + ", is not in any classpath sub-directories: " + System.getProperty("java.class.path"));
+						throw new Hinderance("Fail to locate property file: " + aPropsFile);
+					} 
+				}
+			} 
+		}
 		App.logInfo("Found property file at: " + propFile.getAbsolutePath());
 		return(propFile.getAbsolutePath());
-
-		/*
-		if (propFile != null) {
-			String fullFileNameWithPath = propFile.getAbsolutePath();
-			App.logInfo("Found property file at: " + fullFileNameWithPath);
-		} else {
-			App.logEror("Fail to locate property file: " + aPropsFile);
-			return;
-		}
-
-		String configPath = aFileName; 
-		File configFile = new File(aFileName);
-		if (configFile.getParent() == null) {
-			configPath = Paths.get(App.ConfigPath, aFileName).toString();
-		}
-		return(configPath);
-		*/
 	}
 
 	public static void OpenLogFile() throws Exception {
@@ -584,18 +593,18 @@ public class App {
 	}
 
 	public static synchronized void log(Level aLevel, Throwable ex) {
-		App.log(aLevel, Hinderance.exToStr(ex));
+		App.log(aLevel, Hinderance.ExToStr(ex));
 	};
 
 	public static synchronized void log(Level aLevel, int aThreadId, Throwable ex) {
-		App.log(aLevel, aThreadId, Hinderance.exToStr(ex));
+		App.log(aLevel, aThreadId, Hinderance.ExToStr(ex));
 	}
 
 	public static void logInfo(String aMessage) {
 		App.log(Level.INFO, aMessage);
 	}
 
-	public static void logInfo(Class aSource, String aMessage) {
+	public static void logInfo(Class<?> aSource, String aMessage) {
 		App.log(Level.INFO, "[" + aSource.getSimpleName() + "]" + " " + aMessage);
 	}
 
@@ -608,11 +617,11 @@ public class App {
 	}
 
 	public static void logInfo(Throwable ex) {
-		App.log(Level.INFO, Hinderance.exToStr(ex));
+		App.log(Level.INFO, Hinderance.ExToStr(ex));
 	}
 
 	public static void logInfo(int aThreadId, Throwable ex) {
-		App.log(Level.INFO, aThreadId, Hinderance.exToStr(ex));
+		App.log(Level.INFO, aThreadId, Hinderance.ExToStr(ex));
 	}
 
 	public static void logEror(String aMessage) {
@@ -623,35 +632,39 @@ public class App {
 		App.log(Level.SEVERE, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage);
 	}
 
+	public static void logEror(Class<?> aSource, String aMessage) {
+		App.log(Level.SEVERE, "[" + aSource.getSimpleName() + "]" + " " + aMessage);
+	}
+
 	public static void logEror(int aThreadId, String aMessage) {
 		App.log(Level.SEVERE, aThreadId, aMessage);
 	}
 
 	public static void logEror(Throwable ex) {
-		App.log(Level.SEVERE, Hinderance.exToStr(ex));
+		App.log(Level.SEVERE, Hinderance.ExToStr(ex));
 	}
 
 	public static void logEror(Object aSource, Throwable ex) {
-		App.log(Level.SEVERE, "[" + aSource.getClass().getSimpleName() + "]" + " " + Hinderance.exToStr(ex));
+		App.log(Level.SEVERE, "[" + aSource.getClass().getSimpleName() + "]" + " " + Hinderance.ExToStr(ex));
 	}
 
 	public static void logEror(Throwable ex, String aMessage) {
-		App.log(Level.SEVERE, aMessage + App.LineFeed + Hinderance.exToStr(ex));
+		App.log(Level.SEVERE, aMessage + App.LineFeed + Hinderance.ExToStr(ex));
 	}
 
 	public static void logEror(Object aSource, Throwable ex, String aMessage) {
-		App.log(Level.SEVERE, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage + App.LineFeed + Hinderance.exToStr(ex));
+		App.log(Level.SEVERE, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage + App.LineFeed + Hinderance.ExToStr(ex));
 	}
 
 	public static void logEror(int aThreadId, Throwable ex) {
-		App.log(Level.SEVERE, aThreadId, Hinderance.exToStr(ex));
+		App.log(Level.SEVERE, aThreadId, Hinderance.ExToStr(ex));
 	}
 
 	public static void logWarn(String aMessage) {
 		App.log(Level.WARNING, aMessage);
 	}
 
-	public static void logWarn(Class aSource, String aMessage) {
+	public static void logWarn(Class<?> aSource, String aMessage) {
 		App.log(Level.WARNING, "[" + aSource.getSimpleName() + "]" + " " + aMessage);
 	}
 
@@ -664,23 +677,23 @@ public class App {
 	}
 
 	public static void logWarn(int aThreadId, Throwable ex) {
-		App.log(Level.WARNING, aThreadId, Hinderance.exToStr(ex));
+		App.log(Level.WARNING, aThreadId, Hinderance.ExToStr(ex));
 	}
 
 	public static void logWarn(Throwable ex) {
-		App.log(Level.WARNING, Hinderance.exToStr(ex));
+		App.log(Level.WARNING, Hinderance.ExToStr(ex));
 	}
 
-	public static void logWarn(Class aSource, Throwable ex) {
-		App.log(Level.WARNING, "[" + aSource.getSimpleName() + "]" + " " + Hinderance.exToStr(ex));
+	public static void logWarn(Class<?> aSource, Throwable ex) {
+		App.log(Level.WARNING, "[" + aSource.getSimpleName() + "]" + " " + Hinderance.ExToStr(ex));
 	}
 
 	public static void logWarn(Object aSource, Throwable ex) {
-		App.log(Level.WARNING, "[" + aSource.getClass().getSimpleName() + "]" + " " + Hinderance.exToStr(ex));
+		App.log(Level.WARNING, "[" + aSource.getClass().getSimpleName() + "]" + " " + Hinderance.ExToStr(ex));
 	}
 
 	public static void logWarn(Object aSource, Throwable ex, String aMessage) {
-		App.log(Level.WARNING, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage + App.LineFeed + Hinderance.exToStr(ex));
+		App.log(Level.WARNING, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage + App.LineFeed + Hinderance.ExToStr(ex));
 	}
 
 	public static void logDebg(String aMessage) {
@@ -695,16 +708,16 @@ public class App {
 		App.log(Level.FINE, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage);
 	}
 
-	public static void logDebg(Class aSource, String aMessage) {
+	public static void logDebg(Class<?> aSource, String aMessage) {
 		App.log(Level.FINE, "[" + aSource.getSimpleName() + "]" + " " + aMessage);
 	}
 
 	public static void logDebg(int aThreadId, Throwable ex) {
-		App.log(Level.FINE, aThreadId, Hinderance.exToStr(ex));
+		App.log(Level.FINE, aThreadId, Hinderance.ExToStr(ex));
 	}
 
 	public static void logDebg(Object aSource, Throwable ex, String aMessage) {
-		App.log(Level.FINE, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage + App.LineFeed + Hinderance.exToStr(ex));
+		App.log(Level.FINE, "[" + aSource.getClass().getSimpleName() + "]" + " " + aMessage + App.LineFeed + Hinderance.ExToStr(ex));
 	}
 
 	public static void logConf(String aMessage) {
@@ -923,7 +936,6 @@ public class App {
 		int dummy;
 		int dummy1;
 		int l = aSzHex.length();
-		int index = 0;
 		int j = 0;
 		int L = aSeed.length();
 		String strDecrypted = "";
@@ -944,7 +956,6 @@ public class App {
 				dummy = -48;
 			}
 			dummy1 += dummy;
-			int temp1 = 0 - ((255 - dummy1) + 1);
 			int temp2 = dummy1 ^ aSeed.charAt(j);
 			strDecrypted = strDecrypted.concat(String.valueOf((char)temp2));
 			if(L == j + 1) {
@@ -953,7 +964,6 @@ public class App {
 				j++;
 			}
 			i += 2;
-			index++;
 		}
 
 		return strDecrypted;
@@ -971,7 +981,7 @@ public class App {
 		return s;
 	}
 
-	public static void ShowThreadingStatus(Class aClassName, String aModule, Integer aThreadNum, Integer aMaxThread, int aCntrAttempt, int aMaxAttempt) {
+	public static void ShowThreadingStatus(Class<?> aClassName, String aModule, Integer aThreadNum, Integer aMaxThread, int aCntrAttempt, int aMaxAttempt) {
 		if (aThreadNum >= aMaxThread) {
 			App.logWarn(aClassName, "[" + aModule + "] " + "Maximum thread reach: " + aMaxThread + ", will wait for other thread to complete...");
 		} else {
@@ -1021,6 +1031,23 @@ public class App {
 		}
 	}
 
+	public static void InitAppProps(String aFileName) throws Exception {
+		App.PropertyFileName = aFileName;
+		String filePathName = App.GetPropFullName(aFileName);
+		File propsFile = new File(filePathName);
+		if (propsFile.exists() == false) { // if no property file, create one
+			System.out.println("Fail to locate property file: " + filePathName + ", creating it....");
+			try {
+				propsFile.createNewFile();
+			} catch(IOException ex) {
+				throw new Hinderance(ex, "Fail to create property file: " + filePathName);
+			}
+		}
+		FileInputStream inStream = new FileInputStream(filePathName);
+		App.AppProps = new Properties();
+		App.AppProps.load(inStream);
+	}
+
 	public static void main(String[] args) {
 		String tempDir = System.getProperty("java.io.tmpdir");
 		App.ConfigPathWebInf = tempDir;
@@ -1030,6 +1057,7 @@ public class App {
 		try {
 			App.Setup("shujutech.properties"); 
 			Simple simple = new Simple();
+			App.logInfo("Completed testing App with class: " + simple.getClass().getSimpleName());
 		} catch (Exception ex) {
 			App.log(Level.SEVERE, new Hinderance(ex, "App encounter fatal error, application is aborting...."));
 		}
@@ -1043,6 +1071,7 @@ public class App {
 			App.logWarn("This is warning log message"); 
 			App.logDebg("This is debug log message"); 
 			App.log(Level.INFO, "Next exception will be thrown and log beautifully"); 
+			App.logInfo("Completed testing App with class: " + app.getClass().getSimpleName());
 		} catch (Exception ex) {
 			App.log(Level.SEVERE, new Hinderance(ex, "Application encounter fatal error, application is aborting...."));
 		}

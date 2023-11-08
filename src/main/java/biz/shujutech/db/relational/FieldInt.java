@@ -6,8 +6,8 @@ public class FieldInt extends Field {
 	private Integer valueInteger;
 
 	public FieldInt(String aName) {
-		this.setFieldName(aName);
-		this.setFieldType(FieldType.INTEGER);
+		this.setDbFieldName(aName);
+		this.setDbFieldType(FieldType.INTEGER);
 	}
 
 	public Integer getValueInt() {
@@ -25,10 +25,12 @@ public class FieldInt extends Field {
 		this.setValueInt((Integer) value);
 	}
 
+	/*
 	@Override
 	public Object getValueObj() {
 		return(valueInteger);
 	}
+	*/
 
 	@Override
 	public Object getValueObj(Connection aConn) {

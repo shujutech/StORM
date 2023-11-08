@@ -8,8 +8,8 @@ public class FieldDateTime extends Field {
 	private DateTime valueDateTime;
 
 	public FieldDateTime(String aName) {
-		this.setFieldName(aName);
-		this.setFieldType(FieldType.DATETIME);
+		this.setDbFieldName(aName);
+		this.setDbFieldType(FieldType.DATETIME);
 	}
 
 	public FieldDateTime(String aName, DateTime aValue) {
@@ -28,13 +28,16 @@ public class FieldDateTime extends Field {
 
 	@Override
 	public void setValue(Object value) {
+		this.setModified(true);
 		this.setValueDateTime((DateTime) value);
 	}
 
+	/*
 	@Override
 	public Object getValueObj() {
 		return(valueDateTime);
 	}
+	*/
 
 	@Override
 	public Object getValueObj(Connection aConn) {
@@ -56,7 +59,8 @@ public class FieldDateTime extends Field {
 		if (valueStr == null || valueStr.isEmpty() || valueStr.trim().equals("--")) {
 			this.setValueDateTime(null);
 		} else {
-			this.setValueDateTime(DateAndTime.StrToDateTime(valueStr, DateAndTime.FORMAT_TIMEZONE));
+			//this.setValueDateTime(DateAndTime.StrToDateTime(valueStr, DateAndTime.FORMAT_TIMEZONE));
+			this.setValueDateTime(DateAndTime.DisplayStrToDateTime(valueStr));
 		}
 	}
 

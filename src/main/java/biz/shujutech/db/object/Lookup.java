@@ -13,16 +13,16 @@ public interface Lookup {
 	public CopyOnWriteArrayList<Lookup> getLookupList() throws Exception;
 	public void initialize(Connection aConn) throws Exception;
 
-	public static Lookup InsertDefaultList(Connection aConn, Lookup aInstant, Class aClass, String aDescr, CopyOnWriteArrayList<Lookup> aLookupList) throws Exception {
+	public static Lookup InsertDefaultList(Connection aConn, Lookup aInstant, Class<?> aClass, String aDescr, CopyOnWriteArrayList<Lookup> aLookupList) throws Exception {
 		if (aInstant == null) {
 			aInstant = GetListItem(aDescr, aLookupList); // if item is already in list, no need db operation
 			if (aInstant == null) {
-				Lookup criteria = (Lookup) ObjectBase.CreateObject(aConn, aClass);
+				Lookup criteria = (Lookup) ObjectBase.CreateObjectFromAnyClass(aConn, aClass);
 				criteria.setDescr(aDescr);
-				aInstant = (Lookup) ObjectBase.FetchObject(aConn, (Clasz) criteria);
+				aInstant = (Lookup) ObjectBase.FetchObject(aConn, (Clasz<?>) criteria);
 				if (aInstant == null) {
 					criteria.initialize(aConn);
-					ObjectBase.PersistCommit(aConn, (Clasz) criteria);
+					ObjectBase.PersistCommit(aConn, (Clasz<?>) criteria);
 					aInstant = criteria;
 				} else {
 					aInstant.initialize(aConn); // do whatever needed after existing object is Fetch from db
@@ -45,7 +45,7 @@ public interface Lookup {
 		return(result);
 	}
 
-	public static void ClearAndLoadList(Connection aConn, Class aClass, CopyOnWriteArrayList<Lookup> aLookupList) throws Exception {
+	public static void ClearAndLoadList(Connection aConn, Class<?> aClass, CopyOnWriteArrayList<Lookup> aLookupList) throws Exception {
 		PreparedStatement stmt = null;
 		ResultSet rset = null;
 		Lookup objFetched;
@@ -54,7 +54,6 @@ public interface Lookup {
 			rset = ObjectBase.FetchAllByChrono(aConn, aClass, stmt);
 			while((objFetched = (Lookup) ObjectBase.FetchNext(aConn, aClass, rset)) != null) {
 				objFetched.initialize(aConn);
-				//aLookupList.add(objFetched);
 				Add2LookupList(aLookupList, objFetched);
 			}
 		} finally {
@@ -91,15 +90,15 @@ public interface Lookup {
 		return(result);
 	}
 
-	public static Clasz CreateLookupClasz(Connection aConn, String aFieldName, Class aLookupClass) throws Exception {
-		Clasz masterClasz = ObjectBase.CreateObject(aConn, Master.class);
-		Clasz memberLookup = ObjectBase.CreateObject(aConn, aLookupClass);
+	public static <Ty extends Clasz<?>> Clasz<?> CreateLookupClasz(Connection aConn, String aFieldName, Class<Ty> aLookupClass) throws Exception {
+		Clasz<?> masterClasz = ObjectBase.CreateObject(aConn, Master.class);
+		Ty memberLookup = ObjectBase.CreateObject(aConn, aLookupClass);
 		String dbFieldName = Database.Java2DbFieldName(aFieldName);
-		FieldObject memberField = (FieldObject) masterClasz.createFieldObject(dbFieldName, memberLookup);
+		FieldObject<Ty> memberField = masterClasz.createFieldObject(dbFieldName, memberLookup);
 		memberField.setLookup(true);
 		memberField.setDeclareType(aLookupClass.getName());
 		masterClasz.populateLookupField(aConn);
-		return(masterClasz);
+		return masterClasz;
 	}
 
 }

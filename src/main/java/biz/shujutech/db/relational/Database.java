@@ -5,6 +5,7 @@ import biz.shujutech.base.Connection;
 import biz.shujutech.base.DateAndTime;
 import biz.shujutech.base.Hinderance;
 import biz.shujutech.reflect.AttribIndex;
+import biz.shujutech.util.Generic;
 import com.google.common.collect.Multimap;
 import java.io.ByteArrayInputStream;
 import java.sql.DatabaseMetaData;
@@ -16,7 +17,6 @@ import java.sql.Types;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
@@ -41,23 +41,26 @@ public class Database extends BaseDb {
 		CreateIndex(aConn, aTable, true);
 	}
 
-	private static class FieldIndexComparator implements Comparator{
+	private static class FieldIndexComparator implements Comparator<Field> {
 		private int compareType = 0;
 		public FieldIndexComparator(int aCompareType) {
 			this.compareType = aCompareType;
 		}
 
 		@Override
-		public int compare(Object aField1, Object aField2) {
+		public int compare(Field aField1, Field aField2) {
 			int result = 0;
-			Field sp1 = (Field) aField1;
-			Field sp2 = (Field) aField2;
+			//Field sp1 = (Field) aField1;
+			//Field sp2 = (Field) aField2;
+			Field sp1 = aField1;
+			Field sp2 = aField2;
 			if (this.compareType == COMPARE_KEY_OBJECT_INDEX) {
 				result = (sp1.getObjectKeyNo() < sp2.getObjectKeyNo()) ? -1: (sp1.getObjectKeyNo() > sp2.getObjectKeyNo()) ? 1:0 ;
 			} else if (this.compareType == COMPARE_KEY_TABLE_INDEX) {
 				result = (sp1.getIndexKeyNo() < sp2.getIndexKeyNo()) ? -1: (sp1.getIndexKeyNo() > sp2.getIndexKeyNo()) ? 1:0 ;
 			} else {
-				App.logEror("When comparing fields, must specify if the field to be compare is for indexing object or table!");
+				//App.logEror("When comparing fields, must specify if the field to be compare is for indexing object or table!");
+				throw new RuntimeException("When comparing fields, must specify if the field to be compare is for indexing object or table!");
 			}
 			return(result);
 		}
@@ -86,7 +89,7 @@ public class Database extends BaseDb {
 								}
 							}
 						} else {
-							throw new Hinderance("Index name in annotation must be specify, error at: " + aTableName + "." + eachField.getFieldName());
+							throw new Hinderance("Index name in annotation must be specify, error at: " + aTableName + "." + eachField.getDbFieldName());
 						}
 					}
 				} 
@@ -126,7 +129,7 @@ public class Database extends BaseDb {
 				strSql += ", ";
 			}
 			String keyOrder = SortOrder.AsString(eachField.getIndexKeyOrder());
-			strSql += eachField.getFieldName() + " " + keyOrder; 
+			strSql += eachField.getDbFieldName() + " " + keyOrder; 
 			totalField++;
 		}
 		if (totalField != 0) strSql += ")";
@@ -151,7 +154,7 @@ public class Database extends BaseDb {
 		for (Field eachField : aTable.getMetaRec().getFieldBox().values()) {
 			aryField.add(eachField);
 		}
-		Collections.sort(aryField,new FieldIndexComparator(COMPARE_KEY_OBJECT_INDEX));
+		Collections.sort(aryField, new FieldIndexComparator(COMPARE_KEY_OBJECT_INDEX));
 
 		if (aUnique) {
 			unique = "unique ";
@@ -174,7 +177,7 @@ public class Database extends BaseDb {
 					strSql += ", ";
 				}
 				String keyOrder = SortOrder.AsString(eachField.getObjectKeyOrder());
-				strSql += eachField.getFieldName() + " " + keyOrder; 
+				strSql += eachField.getDbFieldName() + " " + keyOrder; 
 				totalField++;
 			}
 		}
@@ -194,7 +197,7 @@ public class Database extends BaseDb {
 		String strSql = "create table " + aTable.getTableName();
 		int totalField = 0;
 		for (Field eachField : aTable.getMetaRec().getFieldBox().values()) {
-			if (eachField.getFieldType() == FieldType.OBJECT) {
+			if (eachField.getDbFieldType() == FieldType.OBJECT) {
 				continue;
 			} // ignore and don't do anything to OBJECT field types
 			if (totalField == 0) {  
@@ -202,8 +205,8 @@ public class Database extends BaseDb {
 			} else {
 				strSql += ", ";
 			}
-			strSql += eachField.getFieldName(); 
-			strSql += " " + DdlFieldType(aConn, eachField.getFieldType(), eachField.getFieldSize());
+			strSql += eachField.getDbFieldName(); 
+			strSql += " " + DdlFieldType(aConn, eachField.getDbFieldType(), eachField.getFieldSize());
 			if (eachField.getDefaultValue().isEmpty() == false) {
 				strSql += " default " + eachField.getDefaultValue();
 			}
@@ -257,7 +260,7 @@ public class Database extends BaseDb {
 				} else {
 					strSql += ", ";
 				}
-				strSql += eachField.getFieldName(); 
+				strSql += eachField.getDbFieldName(); 
 				totalField++;
 			}
 		}
@@ -338,7 +341,7 @@ public class Database extends BaseDb {
 		try {
 			stmt = aConn.prepareStatement(strSql);
 			stmt.executeUpdate();
-			//App.logInfo(Database.class, "ddl_create: " + strSql);
+			//App.logInfo(Database.class, "ddl_execute: " + strSql);
 		} catch(Exception ex) {
 			throw new Hinderance(ex, "Fail sql ddl: " + strSql);
 		} finally {
@@ -428,7 +431,7 @@ public class Database extends BaseDb {
 			} else if (aType == FieldType.ENCRYPT) {
 				result = "blob";
 			} else if (aType == FieldType.BASE64) {
-				result = "blob";
+				result = "mediumblob";
 			} else if (aType == FieldType.DATETIME) {
 				result = "timestamp null";
 			} else if (aType == FieldType.DATE) {
@@ -533,7 +536,7 @@ public class Database extends BaseDb {
 	}
 
 	public static String Java2DbTableName(String dbFieldName) {
-		String firstChar = (new Character(dbFieldName.charAt(0))).toString();
+		String firstChar = (Character.valueOf(dbFieldName.charAt(0))).toString();
 		String javaName = dbFieldName.replaceFirst(firstChar, firstChar.toLowerCase());
 		return(Java2DbName(javaName));
 	}
@@ -558,6 +561,8 @@ public class Database extends BaseDb {
 			result = FieldType.STRING;
 		} else if (aType == Types.INTEGER) {
 			result = FieldType.INTEGER;
+		} else if (aType == Types.FLOAT || aType == Types.REAL) {
+			result = FieldType.FLOAT;
 		} else if (aType == Types.DATE) {
 			result = FieldType.DATE;
 		} else if (aType == Types.TIMESTAMP) {
@@ -578,32 +583,33 @@ public class Database extends BaseDb {
 
 	public static int FieldType2JavaSqlType(Field eachField) throws Exception {
 		int result = Integer.MIN_VALUE;
-		if (eachField.getFieldType() == FieldType.STRING) {
+		if (eachField.getDbFieldType() == FieldType.STRING) {
 			result = Types.VARCHAR;
-		} else	if (eachField.getFieldType() == FieldType.HTML) {
+		} else	if (eachField.getDbFieldType() == FieldType.HTML) {
 			result = Types.LONGVARCHAR;
-		} else	if (eachField.getFieldType() == FieldType.DATETIME) {
+		} else	if (eachField.getDbFieldType() == FieldType.DATETIME) {
 			result = Types.TIMESTAMP_WITH_TIMEZONE;
-		} else	if (eachField.getFieldType() == FieldType.DATE) {
+		} else	if (eachField.getDbFieldType() == FieldType.DATE) {
 			result = Types.DATE;
-		} else	if (eachField.getFieldType() == FieldType.LONG) {
+		} else	if (eachField.getDbFieldType() == FieldType.LONG) {
 			result = Types.BIGINT;
-		} else	if (eachField.getFieldType() == FieldType.INTEGER) {
+		} else	if (eachField.getDbFieldType() == FieldType.INTEGER) {
 			result = Types.INTEGER;
-		} else	if (eachField.getFieldType() == FieldType.FLOAT) {
+		} else	if (eachField.getDbFieldType() == FieldType.FLOAT) {
 			result = Types.FLOAT;
-		} else	if (eachField.getFieldType() == FieldType.BOOLEAN) {
+		} else	if (eachField.getDbFieldType() == FieldType.BOOLEAN) {
 			result = Types.BOOLEAN;
-		} else	if (eachField.getFieldType() == FieldType.ENCRYPT) {
+		} else	if (eachField.getDbFieldType() == FieldType.ENCRYPT) {
 			result = Types.LONGVARBINARY;
-		} else	if (eachField.getFieldType() == FieldType.BASE64) {
+		} else	if (eachField.getDbFieldType() == FieldType.BASE64) {
 			result = Types.LONGVARBINARY;
 		} else {
-			throw new Hinderance("Unknown type for field: " + eachField.getFieldName().toUpperCase() + " when attempting to set it for SQL operation");
+			throw new Hinderance("Unknown type for field: " + eachField.getDbFieldName().toUpperCase() + " when attempting to set it for SQL operation");
 		}
 		return(result);
 	}
 
+	/*
 	public static void ShowSetStmt(List<Field> fieldArr) throws Exception {
 		for(int cntrField = 0, cntrStmt = 0; cntrField < fieldArr.size(); cntrField++, cntrStmt++) {
 			Field eachField = fieldArr.get(cntrField);
@@ -617,9 +623,10 @@ public class Database extends BaseDb {
 			App.logInfo("Setting preparedstatement for col: " + eachField.getFieldName().toUpperCase() + ", value: " + valueDb);
 		}
 	}
+	*/
 
-	public static void SetStmtValue(PreparedStatement stmt, List<Field> fieldArr) throws Exception {
-		SetStmtValue(stmt, fieldArr, 0);
+	public static void SetStmtValue(Connection aConn, PreparedStatement stmt, List<Field> fieldArr) throws Exception {
+		SetStmtValue(aConn, stmt, fieldArr, 0);
 	}
 
 	public static boolean IsSelectStmt(Statement aStmt) throws Exception {
@@ -646,58 +653,58 @@ public class Database extends BaseDb {
 		return(result);
 	}
 
-	public static void SetStmtValue(PreparedStatement stmt, List<Field> fieldArr, int aStartIndex) throws Exception {
+	public static void SetStmtValue(Connection aConn, PreparedStatement stmt, List<Field> fieldArr, int aStartIndex) throws Exception {
 		for(int cntrField = 0, cntrStmt = aStartIndex; cntrField < fieldArr.size(); cntrField++) {
 			Field eachField = fieldArr.get(cntrField);
 			if (eachField != null) {
 				if (eachField.getFormulaStr() == null || eachField.getFormulaStr().isEmpty() || eachField.getFormulaStr().contains("?")) {
 					try {
-						if (eachField.getFieldType() == FieldType.OBJECT || eachField.getFieldType() == FieldType.OBJECTBOX) { // ignore and don't do anything to OBJECT field types
-							App.logWarn(Database.class, "Trying to SetStmtValue for not atomic field types, field: " + eachField.getFieldName());
+						if (eachField.getDbFieldType() == FieldType.OBJECT || eachField.getDbFieldType() == FieldType.OBJECTBOX) { // ignore and don't do anything to OBJECT field types
+							App.logWarn(Database.class, "Trying to SetStmtValue for not atomic field types, field: " + eachField.getDbFieldName());
 							continue;
 						} 
 
-						Object valueDb = eachField.getValueObj();
+						Object valueDb = eachField.getValueObj(aConn);
 						if (valueDb == null) {
 							//if (stmt.toString().toLowerCase().startsWith("select") == false) {
 							if (IsSelectStmt(stmt) == false) {
 								stmt.setNull(++cntrStmt, FieldType2JavaSqlType(eachField));	// only do this for update or delete, for select can't do setNull, use is NULL with no ? parameter				
 							}
 						} else {
-							if (eachField.getFieldType() == FieldType.STRING) {
+							if (eachField.getDbFieldType() == FieldType.STRING) {
 								stmt.setString(++cntrStmt, eachField.getValueStr());
-							} else	if (eachField.getFieldType() == FieldType.HTML) {
+							} else	if (eachField.getDbFieldType() == FieldType.HTML) {
 								stmt.setString(++cntrStmt, eachField.getValueStr());
-							} else	if (eachField.getFieldType() == FieldType.DATETIME) {
+							} else	if (eachField.getDbFieldType() == FieldType.DATETIME) {
 								String dbDate = DateAndTime.FormatForJdbcTimestamp(((FieldDateTime) eachField).getValueDateTime());
 								java.sql.Timestamp dateValue = java.sql.Timestamp.valueOf(dbDate); // format must be in "2005-04-06 09:01:10"
 								stmt.setTimestamp(++cntrStmt, dateValue);
-							} else	if (eachField.getFieldType() == FieldType.DATE) {
+							} else	if (eachField.getDbFieldType() == FieldType.DATE) {
 								String dbDate = DateAndTime.FormatForJdbcDate(((FieldDate) eachField).getValueDate());
 								java.sql.Date dateValue = java.sql.Date.valueOf(dbDate); // format must be in "2005-04-06 09:01:10"
 								stmt.setDate(++cntrStmt, dateValue);
-							} else	if (eachField.getFieldType() == FieldType.LONG) {
+							} else	if (eachField.getDbFieldType() == FieldType.LONG) {
 								stmt.setLong(++cntrStmt, ((FieldLong) eachField).getValueLong());
-							} else	if (eachField.getFieldType() == FieldType.INTEGER) {
+							} else	if (eachField.getDbFieldType() == FieldType.INTEGER) {
 								stmt.setInt(++cntrStmt, ((FieldInt) eachField).getValueInt());
-							} else	if (eachField.getFieldType() == FieldType.FLOAT) {
+							} else	if (eachField.getDbFieldType() == FieldType.FLOAT) {
 								stmt.setFloat(++cntrStmt, ((FieldFloat) eachField).getValueFloat());
-							} else	if (eachField.getFieldType() == FieldType.BOOLEAN) {
+							} else	if (eachField.getDbFieldType() == FieldType.BOOLEAN) {
 								stmt.setBoolean(++cntrStmt, ((FieldBoolean) eachField).getValueBoolean());
-							} else	if (eachField.getFieldType() == FieldType.ENCRYPT) {
+							} else	if (eachField.getDbFieldType() == FieldType.ENCRYPT) {
 								//stmt.setString(++cntrStmt, (String) eachField.getValueObj());
-								stmt.setBytes(++cntrStmt, ((String) eachField.getValueObj()).getBytes());
-							} else	if (eachField.getFieldType() == FieldType.BASE64) {
+								stmt.setBytes(++cntrStmt, ((String) eachField.getValueObj(aConn)).getBytes());
+							} else	if (eachField.getDbFieldType() == FieldType.BASE64) {
 								//stmt.setString(++cntrStmt, (String) eachField.getValueObj());
 								byte[] strAsByte = eachField.getValueStr().getBytes();
 								ByteArrayInputStream bais = new ByteArrayInputStream(strAsByte);
 								stmt.setBinaryStream(++cntrStmt, bais, strAsByte.length);
 							} else {
-								throw new Hinderance("Unknown type for field: " + eachField.getFieldName().toUpperCase() + " when attempting to set it for SQL operation");
+								throw new Hinderance("Unknown type for field: " + eachField.getDbFieldName().toUpperCase() + " when attempting to set it for SQL operation");
 							}
 						}
 					} catch(Exception ex) {
-						throw new Hinderance(ex, "Fail to place value into sql stmt, field: " + eachField.getFieldName().toUpperCase() + ", sql: " + stmt.toString());
+						throw new Hinderance(ex, "Fail to place value into sql stmt, field: " + eachField.getDbFieldName().toUpperCase() + ", sql: " + stmt.toString());
 					}
 				}
 			}
@@ -721,59 +728,82 @@ public class Database extends BaseDb {
 		return(result);
 	}
 	
-	public static List<Field> GetWhereClause(Multimap<String, Record> aWhereBox, StringBuffer aWhereStr) throws Exception {
-		/*
-		List<Field> fieldArr = new CopyOnWriteArrayList<>();
-		for (String eachTableName : aWhereBox.keySet()) {
-			for (Record eachWhereRec: aWhereBox.values()) {
-				//Record eachWhereRec = aWhereBox.get(eachTableName);
-				List<Field> tmpFieldArr = GetWhereClause(eachTableName, eachWhereRec, aWhereStr);
-				for (Field eachField: tmpFieldArr) {
-					fieldArr.add(eachField);
-				}
-			}
-		}
-		*/
+	public static List<Field> GetWhereClause(Connection aConn, Multimap<String, Record> aWhereBox, StringBuffer aWhereStr) throws Exception {
 		List<Field> fieldArr = new CopyOnWriteArrayList<>();
 		aWhereBox.asMap().forEach((eachTableName, collection) -> {
 			collection.forEach(eachWhereRec -> {
 				try {
-					List<Field> tmpFieldArr = GetWhereClause(eachTableName, eachWhereRec, aWhereStr);
+					List<Field> tmpFieldArr = GetWhereClause(aConn, eachTableName, eachWhereRec, aWhereStr);
 					for (Field eachField: tmpFieldArr) {
 						fieldArr.add(eachField);
 					}
 				} catch(Exception ex) {
-					App.logEror(Database.class, ex, "Fail to get where clause from multimap");
+					//App.logEror(Database.class, ex, "Fail to get where clause from multimap");
+					//throw new Hinderance(ex, "Fail to get where clause from multimap");
+					throw new RuntimeException(ex);
 				} 
 			});
 		});
 		return(fieldArr);
 	}
 
-	public static List<Field> GetWhereClause(String aTableName, Record aWhere, StringBuffer aWhereStr) throws Exception {
+	public static List<Field> GetWhereClause(Connection aConn, String aTableName, Record aWhereRec, StringBuffer aWhereStr) throws Exception {
 		int cntrWhere = 0;
 		String sqlWhere = "";
 		List<Field> fieldArr = new CopyOnWriteArrayList<>();
-		if (aWhere != null && aWhere.totalField() != 0) {
-			for (Field eachField : aWhere.getFieldBox().values()) {
+		if (aWhereRec != null && aWhereRec.totalField() != 0) {
+			for (Field eachField : aWhereRec.getFieldBox().values()) {
 				if (cntrWhere != 0) {
 					sqlWhere += " and ";
 				}
-				if (eachField.getFormulaStr().isEmpty()) {
-					if (eachField.getValueObj() == null) {
-						sqlWhere += aTableName + "." + eachField.getFieldName() + " is NULL";
-					} else {
-						sqlWhere += aTableName + "." + eachField.getFieldName() + " = ?";
+
+				if (eachField instanceof FieldRecord) {
+					String fobWhereStr = "";
+					Record eachRecord = ((FieldRecord) eachField).getRecord();
+
+					StringBuffer strBuffer = new StringBuffer();
+					List<Field> fieldArrTmp = GetWhereClause(aConn, aTableName, eachRecord, strBuffer); // recursive
+					for(Field eachFieldTmp : fieldArrTmp) {
+						fieldArr.add(eachFieldTmp);
+					}
+					String sqlFobWhere = strBuffer.toString();
+					if (sqlFobWhere.isEmpty() == false) {
+						if (fobWhereStr.length() > 0) sqlFobWhere = " or " + sqlFobWhere;
+						fobWhereStr += sqlFobWhere;
+					}
+
+					if (fobWhereStr.isEmpty() == false) {
+						fobWhereStr = "(" + fobWhereStr + ")";
+						sqlWhere += fobWhereStr; // and ((fob_tab.col1 = ? and fob_tab.col2 = ?) or (fob_tab.col1 = ? and fob_tab.col2 = ?))
 					}
 				} else {
-					sqlWhere += eachField.getFormulaStr();
+					if (eachField.getFormulaStr().isEmpty()) {
+						if (eachField.getValueObj(aConn) == null) {
+							sqlWhere += aTableName + "." + eachField.getDbFieldName() + " is NULL";
+						} else {
+							sqlWhere += aTableName + "." + eachField.getDbFieldName() + " = ?";
+						}
+						fieldArr.add(eachField); // place in array for resultSet.setObject according to ? position
+					} else {
+						sqlWhere += eachField.getFormulaStr();
+						if (eachField.getFormulaStr().contains("?")) {
+							fieldArr.add(eachField); 
+						}
+					}
 				}
-				fieldArr.add(eachField); // place in array for resultSet.setObject according to ? position
+
 				cntrWhere++;
 			}
 		}
-		if (aWhereStr.length() > 0) sqlWhere = " and " + sqlWhere;
-		aWhereStr.append(sqlWhere);
+
+		if (sqlWhere.isEmpty() == false) {
+			if (sqlWhere.startsWith("(") == false) sqlWhere = "(" + sqlWhere + ")";
+			if (aWhereStr.length() > 0) {
+					sqlWhere = " and " + sqlWhere;
+			}
+			aWhereStr.append(sqlWhere);
+		}
+		
 		return(fieldArr);
 	}
 
@@ -786,10 +816,10 @@ public class Database extends BaseDb {
 					continue;
 				}
 
-				if (eachField.getFieldType() == FieldType.OBJECT) { // ignore and don't do anything to OBJECT field types
+				if (eachField.getDbFieldType() == FieldType.OBJECT) { // ignore and don't do anything to OBJECT field types
 					continue;
 				}
-				if (eachField.getFieldType() == FieldType.OBJECTBOX) { // ignore and don't do anything to OBJECT field types
+				if (eachField.getDbFieldType() == FieldType.OBJECTBOX) { // ignore and don't do anything to OBJECT field types
 					continue;
 				} 
 
@@ -798,15 +828,15 @@ public class Database extends BaseDb {
 				} 
 				if (eachField.getFormulaStr().isEmpty()) {
 					if (Database.GetDbType(aConn) == DbType.MYSQL  || Database.GetDbType(aConn) == Database.DbType.ORACLE) {
-						sqlField2Update += aTableName + "." + eachField.getFieldName() + " = ?";
+						sqlField2Update += aTableName + "." + eachField.getDbFieldName() + " = ?";
 					} else {
-						sqlField2Update += eachField.getFieldName() + " = ?";
+						sqlField2Update += eachField.getDbFieldName() + " = ?";
 					}
 				} else {
 					if (Database.GetDbType(aConn) == DbType.MYSQL  || Database.GetDbType(aConn) == Database.DbType.ORACLE) {
-						sqlField2Update += aTableName + "." + eachField.getFieldName() + " = " + eachField.getFormulaStr();
+						sqlField2Update += aTableName + "." + eachField.getDbFieldName() + " = " + eachField.getFormulaStr();
 					} else {
-						sqlField2Update += eachField.getFieldName() + " = " + eachField.getFormulaStr();
+						sqlField2Update += eachField.getDbFieldName() + " = " + eachField.getFormulaStr();
 					}
 				}
 				fieldArr.add(eachField); // place in array for resultSet.setObject according to ? position
@@ -824,10 +854,10 @@ public class Database extends BaseDb {
 		if (aRec2Insert != null && aRec2Insert.totalField() != 0) {
 			for (Field eachField : aRec2Insert.getFieldBox().values()) {
 
-				if (eachField.getFieldType() == FieldType.OBJECT) {
+				if (eachField.getDbFieldType() == FieldType.OBJECT) {
 					continue;
 				} // ignore and don't do anything to OBJECT field types
-				if (eachField.getFieldType() == FieldType.OBJECTBOX) {
+				if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
 					continue;
 				} // ignore and don't do anything to OBJECT field types
 
@@ -839,7 +869,7 @@ public class Database extends BaseDb {
 				} // only append comma in between columns
 
 				//strField += aTableName + "." + eachField.getFieldName();
-				strField += eachField.getFieldName();
+				strField += eachField.getDbFieldName();
 				if (eachField.getFormulaStr().isEmpty()) {
 					strHolder += "?";
 				} else {
@@ -915,7 +945,7 @@ public class Database extends BaseDb {
 		try {
 			if (doExecute) ExecuteDdl(aConn, sqlRename);
 		} catch(Exception ex) {
-			App.logEror(ex, "Error, will not be renaming the primary key constraint");
+			App.logEror(ex, "Error, will not be renaming the primary key constraint from: " + aOldTableName + ", to: " + aNewTableName);
 		}
 	}
 
@@ -952,10 +982,10 @@ public class Database extends BaseDb {
 		String strSql = "alter table " + aTable.getTableName() + " add ";
 		int totalField = 0;
 		for (Field eachField : aTable.getMetaRec().getFieldBox().values()) {
-			if (eachField.getFieldType() == FieldType.OBJECT) {
+			if (eachField.getDbFieldType() == FieldType.OBJECT) {
 				continue;
 			} // ignore and don't do anything to OBJECT field types
-			if (eachField.getFieldType() == FieldType.OBJECTBOX) {
+			if (eachField.getDbFieldType() == FieldType.OBJECTBOX) {
 				continue;
 			} // ignore and don't do anything to OBJECTBOX field types
 
@@ -972,8 +1002,8 @@ public class Database extends BaseDb {
 					strSql += ", add ";
 				}
 			}
-			strSql += eachField.getFieldName(); 
-			strSql += " " + DdlFieldType(aConn, eachField.getFieldType(), eachField.getFieldSize());
+			strSql += eachField.getDbFieldName(); 
+			strSql += " " + DdlFieldType(aConn, eachField.getDbFieldType(), eachField.getFieldSize());
 			totalField++;
 		}
 		if (totalField != 0) {
@@ -1009,7 +1039,7 @@ public class Database extends BaseDb {
 			for(int cntrCol = 0; cntrCol < metaData.getColumnCount(); cntrCol++) {
 				String fieldName = metaData.getColumnName(cntrCol + 1).toLowerCase().trim();
 				for(Field eachField : aRecord.getFieldBox().values()) {
-					if (eachField.getFieldName().toLowerCase().trim().equals(fieldName)) {
+					if (eachField.getDbFieldName().toLowerCase().trim().equals(fieldName)) {
 						result = true;
 						break;
 					}
@@ -1026,26 +1056,29 @@ public class Database extends BaseDb {
 		return(result);
 	}
 
-	public static List<List> ExecuteSQL(Connection aConn, String aSqlStr, List<Field> aBindField) throws Exception {
+	public static List<List<String>> ExecuteSQL(Connection aConn, String aSqlStr, List<Field> aBindField) throws Exception {
 		PreparedStatement stmt = aConn.prepareStatement(aSqlStr);
 		return(ExecuteSQL(aConn, stmt, aBindField));
 	}
 
-	public static List<List> ExecuteSQL(Connection aConn, PreparedStatement aStmt, List<Field> aBindField) throws Exception {
-		List<List> listOfLists = new CopyOnWriteArrayList<>();
-		Database.SetStmtValue(aStmt, aBindField);
-		ResultSet rset = aStmt.executeQuery();
-		ResultSetMetaData metaData = rset.getMetaData();
-		int columns = metaData.getColumnCount();
-		while (rset.next()) {
-			List<String> list = new CopyOnWriteArrayList<String>();
-			for (int cntr = 0; cntr < columns; cntr++) {
-				list.add(rset.getString(cntr + 1));
+	public static List<List<String>> ExecuteSQL(Connection aConn, PreparedStatement aStmt, List<Field> aBindField) throws Exception {
+		try {
+			List<List<String>> listOfLists = new CopyOnWriteArrayList<>();
+			Database.SetStmtValue(aConn, aStmt, aBindField);
+			ResultSet rset = aStmt.executeQuery();
+			ResultSetMetaData metaData = rset.getMetaData();
+			int columns = metaData.getColumnCount();
+			while (rset.next()) {
+				List<String> list = new CopyOnWriteArrayList<>();
+				for (int cntr = 0; cntr < columns; cntr++) {
+					list.add(rset.getString(cntr + 1));
+				}
+				listOfLists.add(list);
 			}
-			listOfLists.add(list);
+			return listOfLists;
+		} catch(Exception ex) {
+			throw new Hinderance(ex, "Fail sql: " + aStmt.toString());
 		}
-
-		return listOfLists;
 	}
 
 	public static boolean DuplicateError(Exception ex) {
@@ -1069,6 +1102,147 @@ public class Database extends BaseDb {
 		} else if (GetDbType(aConn) == DbType.POSTGRESQL) {
 			result = "to_char(" + aTableName + "." + aFieldName + ", 'YYYY')::integer";
 		} else if (GetDbType(aConn) == DbType.ORACLE) {
+		} else {
+		}
+		return(result);
+	}
+
+	public static String GetMonthSql(Connection aConn, String aTableName, String aFieldName) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.MYSQL) {
+			result = "month(" + aTableName + "." + aFieldName + ")";
+		} else if (GetDbType(aConn) == DbType.POSTGRESQL) {
+			result = "to_char(" + aTableName + "." + aFieldName + ", 'MM')::integer";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+		} else {
+		}
+		return(result);
+	}
+
+	public static String GetDaySql(Connection aConn, String aTableName, String aFieldName) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.MYSQL) {
+			result = "day(" + aTableName + "." + aFieldName + ")";
+		} else if (GetDbType(aConn) == DbType.POSTGRESQL) {
+			result = "to_char(" + aTableName + "." + aFieldName + ", 'DD')::integer";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+		} else {
+		}
+		return(result);
+	}
+
+	public static void AddColumn(Connection aConn, Table aTargetTable) throws Exception {
+		String targetTableName = aTargetTable.getTableName().toLowerCase();
+		List<Field> missingField = new CopyOnWriteArrayList<>();
+		Table existingTable = new Table(targetTableName);
+		existingTable.initMeta(aConn);
+		if (Database.TableExist(aConn, targetTableName)) {
+			for (Field eachField : aTargetTable.getMetaRec().getFieldBox().values()) {
+				if (existingTable.fieldExist(eachField.getDbFieldName()) == false) {
+					missingField.add(eachField);
+				}
+			}
+		} else {
+			throw new Hinderance("Cannot add column on a non existing table: " + aTargetTable.getTableName());
+		}
+
+		String strSqlFull = "alter table " +  targetTableName;
+		String strSqlCol = "";
+		for (Field eachField : missingField) {
+			String dbFieldType = DdlFieldType(aConn, eachField.getDbFieldType(), eachField.getFieldSize());
+			if (strSqlCol.isEmpty() == false) strSqlCol += ", ";
+			strSqlCol += " add column " + eachField.getDbFieldName() + " " + dbFieldType;
+		}
+
+		if (strSqlCol.isEmpty() == false) {
+			strSqlFull += " " + strSqlCol;
+			ExecuteDdl(aConn, strSqlFull);
+		} else {
+			// no column to add, do nothing
+		}
+	}
+
+	public static String RightPadSql(Connection aConn, String aColName, int aLen, String aPadStr) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.MYSQL || GetDbType(aConn) == DbType.POSTGRESQL) {
+			result = "rpad (" + aColName + ", " + String.valueOf(aLen) + ", '" + aPadStr + "')";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+			throw new Hinderance("Oraclel RightPadSql is not supprted yeat");
+		} else {
+		}
+		return(result);
+	}
+
+	public static String LeftPadSql(Connection aConn, String aColName, int aLen, String aPadStr) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.MYSQL || GetDbType(aConn) == DbType.POSTGRESQL) {
+			result = "lpad (" + aColName + ", " + String.valueOf(aLen) + ", '" + aPadStr + "')";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+			throw new Hinderance("Oraclel LeftPadSql is not supprted yeat");
+		} else {
+		}
+		return(result);
+	}
+
+	public static String DateTimeForSort(Connection aConn, String aColName) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.POSTGRESQL) {
+			result = "to_char(" + aColName + ", 'yyyyMMddHHmmss')";
+		} else if (GetDbType(aConn) == DbType.MYSQL) {
+			result = "date_format(" + aColName + ", '%Y%m%d%H%i%S')";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+			throw new Hinderance("Oraclel DateForSort is not supprted yeat");
+		} else {
+		}
+		return(result);
+	}
+
+	public static String DateForSort(Connection aConn, String aColName) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.POSTGRESQL) {
+			result = "to_char(" + aColName + ", 'yyyyMMdd')";
+		} else if (GetDbType(aConn) == DbType.MYSQL) {
+			result = "date_format(" + aColName + ", '%Y%m%d')";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+			throw new Hinderance("Oraclel DateForSort is not supprted yeat");
+		} else {
+		}
+		return(result);
+	}
+
+	public static String Num2StrSql(Connection aConn, String aColName) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.POSTGRESQL) {
+			/*
+			String numFormat = "";
+			for(int cntr = 0; cntr < Generic.MAX_DIGIT_FOR_SORT; cntr++) numFormat += "9";
+			result = "to_char(" + aColName + ", '" + numFormat + "')";
+			*/
+			result = "cast(" + aColName + " as varchar)";
+		} else if (GetDbType(aConn) == DbType.MYSQL) {
+			result = "convert(" + aColName + ", CHAR)";
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+			throw new Hinderance("Oraclel DateForSort is not supprted yeat");
+		} else {
+		}
+		return(result);
+	}
+
+	public static String Float2StrSql(Connection aConn, String aColName) throws Exception {
+		String result = "";
+		if (GetDbType(aConn) == DbType.POSTGRESQL) {
+			String floatFormat = "";
+			for(int cntr = 0; cntr < Generic.MAX_FLOAT_FOR_SORT; cntr++) {
+				if (cntr == 16) // must match Generic.FloatFormatForSort
+					floatFormat += "D";
+				else
+					floatFormat += "9";
+			}
+			result = "to_char(" + aColName + ", '" + floatFormat + "')";
+		} else if (GetDbType(aConn) == DbType.MYSQL) {
+			result = "convert(" + aColName + ", DECIMAL(" + Generic.MAX_FLOAT_FOR_SORT + ", 3))"; // 3 must match Generic.FloatFormatForSort
+		} else if (GetDbType(aConn) == DbType.ORACLE) {
+			throw new Hinderance("Oraclel DateForSort is not supprted yeat");
 		} else {
 		}
 		return(result);

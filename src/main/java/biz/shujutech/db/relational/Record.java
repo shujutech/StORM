@@ -6,7 +6,6 @@ import biz.shujutech.base.Hinderance;
 import biz.shujutech.db.object.Clasz;
 import biz.shujutech.db.object.FieldObject;
 import biz.shujutech.db.object.FieldObjectBox;
-import biz.shujutech.db.object.ObjectBase;
 import java.sql.ResultSet;
 import java.util.Collection;
 import org.joda.time.DateTime;
@@ -25,9 +24,9 @@ public class Record extends Base {
 	public Record(Record aRec) throws Exception {
 		for (Field eachField : aRec.getFieldBox().values()) {
 			if (eachField.getFieldSize() == 0) {
-				this.createField(eachField.getFieldName(), eachField.getFieldType());
+				this.createField(eachField.getDbFieldName(), eachField.getDbFieldType());
 			} else {
-				this.createField(eachField.getFieldName(), eachField.getFieldType(), eachField.getFieldSize());
+				this.createField(eachField.getDbFieldName(), eachField.getDbFieldType(), eachField.getFieldSize());
 			}
 		}
 	}
@@ -43,6 +42,18 @@ public class Record extends Base {
 			break;
 		}
 		return(result);
+	}
+
+	public FieldInt createFieldInt(String aName, Integer aValue) throws Exception {
+		FieldInt result = (FieldInt) createField(aName, FieldType.INTEGER);
+		result.setValueInt(aValue);
+		return result;
+	}
+
+	public FieldDate createFieldDate(String aName, DateTime aValue) throws Exception {
+		FieldDate result = (FieldDate) createField(aName, FieldType.DATE);
+		result.setValueDate(aValue);
+		return result;
 	}
 
 	/**
@@ -76,28 +87,32 @@ public class Record extends Base {
 	}
 	// TODO create individual call for each field type (now all field regardless its string, long, datetime are all in the Field class)
 
-	public void createField(Record aRec) throws Exception {
+	public void createField(Connection aConn, Record aRec) throws Exception {
 		for (Field eachField : aRec.getFieldBox().values()) {
-				this.createField(eachField);
+				this.createField(aConn, eachField);
 		}
 	}
 
-	public void createField(Field aField) throws Exception {
-		if (aField.getFieldType() == FieldType.STRING) {
-			this.createField(aField.getFieldName(), aField.getFieldType(), aField.getFieldSize());
-		} else if (aField.getFieldType() == FieldType.LONG) {
-			this.createField(aField.getFieldName(), 0L);
-		} else if (aField.getFieldType() == FieldType.OBJECT) {
-			Clasz obj = (Clasz) ((FieldObject) aField).getValueObj();
-			Clasz newObj = (Clasz) obj.getClass().newInstance();
-			this.createField(aField.getFieldName(), newObj);
-		} else if (aField.getFieldType() == FieldType.OBJECTBOX) {
-			FieldObjectBox field = (FieldObjectBox) aField;
-			Clasz newObj = (Clasz) Class.forName(field.getDeclareType()).newInstance();
-			this.createField(aField.getFieldName(), newObj);
+	public Field createField(Connection aConn, Field aField) throws Exception {
+		Field result;
+		if (aField.getDbFieldType() == FieldType.STRING) {
+			result = this.createField(aField.getDbFieldName(), aField.getDbFieldType(), aField.getFieldSize());
+		} else if (aField.getDbFieldType() == FieldType.LONG) {
+			result = this.createField(aField.getDbFieldName(), 0L);
+		} else if (aField.getDbFieldType() == FieldType.OBJECT) {
+			Clasz<?> obj = (Clasz<?>) ((FieldObject<?>) aField).getValueObj(aConn);
+			Clasz<?> newObj = (Clasz<?>) (obj.getClass()).getConstructor().newInstance();
+			//Clasz newObj = (Clasz) obj.getClass().newInstance();
+			result = this.createFieldObject(aField.getDbFieldName(), newObj);
+		} else if (aField.getDbFieldType() == FieldType.OBJECTBOX) {
+			FieldObjectBox<?> field = (FieldObjectBox<?>) aField;
+			Clasz<?> newObj = (Clasz<?>) (Class.forName(field.getDeclareType())).getConstructor().newInstance();
+			//Clasz newObj = (Clasz) Class.forName(field.getDeclareType()).newInstance();
+			result = this.createFieldObject(aField.getDbFieldName(), newObj);
 		} else {
-			this.createField(aField.getFieldName(), aField.getFieldType());
+			result = this.createField(aField.getDbFieldName(), aField.getDbFieldType());
 		}
+		return(result);
 	}
 
 	public Field createField(String aName, String aValue) throws Exception {
@@ -124,17 +139,17 @@ public class Record extends Base {
 		return(result);
 	}
 
-	public Field createField(String aName, Clasz aObject) throws Exception {
+	public <Ty extends Clasz<?>> FieldObject<Ty> createFieldObject(String aName, Ty aObject) throws Exception {
 		this.checkField(aName);
-		FieldObject oneField = new FieldObject(aName.toLowerCase(), aObject);
+		FieldObject<Ty> oneField = new FieldObject<Ty>(aName.toLowerCase(), aObject);
 		this.fieldBox.put(aName, oneField);
-		return(oneField);
+		return oneField;
 	}
 
-	public Field createField(String aName, FieldObjectBox aBox) throws Exception {
+	public <Ty extends Clasz<?>> FieldObjectBox<Ty> createFieldFob(String aName, FieldObjectBox<Ty> aBox) throws Exception {
 		this.checkField(aName);
-		aBox.setFieldName(aName.toLowerCase());
-		aBox.setFieldType(FieldType.OBJECTBOX);
+		aBox.setDbFieldName(aName.toLowerCase());
+		aBox.setDbFieldType(FieldType.OBJECTBOX);
 		this.fieldBox.put(aName, aBox);
 		return(aBox);
 	}
@@ -168,10 +183,10 @@ public class Record extends Base {
 				result = (FieldDate) result;
 			} else if (result instanceof FieldBoolean) {
 				result = (FieldBoolean) result;
-			} else if (result instanceof FieldObject) {
-				result = (FieldObject) result;
+			} else if (result instanceof FieldObject<?>) {
+				result = (FieldObject<?>) result;
 			} else if (result instanceof FieldObjectBox) {
-				result = (FieldObjectBox) result;
+				result = (FieldObjectBox<?>) result;
 			} else if (result instanceof FieldBase64) {
 				result = (FieldBase64) result;
 			} else if (result instanceof FieldStr) { // many other field inherit from FieldStr, so place it last
@@ -201,7 +216,12 @@ public class Record extends Base {
 	}
 
 	public Field getFieldObjectBox(String aName) throws Exception {
-		Field result = (FieldObjectBox) this.getField(aName);
+		Field result = (FieldObjectBox<?>) this.getField(aName);
+		return(result);
+	}
+
+	public FieldDateTime getFieldDateTime(String aName) throws Exception {
+		FieldDateTime result = (FieldDateTime) this.getField(aName);
 		return(result);
 	}
 
@@ -229,25 +249,25 @@ public class Record extends Base {
 		return(result);
 	}
 
-	public Clasz getValueObject(String aFieldName) throws Exception {
-		FieldObject oneField = (FieldObject) this.getField(aFieldName);
-		Clasz result = oneField.getValueObj();
-		return(result);
+	public Clasz<?> getValueObject(Connection aConn, String aFieldName) throws Exception {
+		FieldObject<?> oneField = (FieldObject<?>) this.getField(aFieldName);
+		Clasz<?> result = oneField.getValueObj(aConn);
+		return result;
 	}
 
-	public Clasz getValueObject(Connection aConn, String aFieldName) throws Exception {
-		FieldObject oneField = (FieldObject) this.getField(aFieldName);
-		Clasz result = oneField.getValueObj(aConn);
-		return(result);
+	public Clasz<?> getValueObject(String aFieldName) throws Exception {
+		FieldObject<?> oneField = (FieldObject<?>) this.getField(aFieldName);
+		Clasz<?> result = oneField.getObj();
+		return result;
 	}
 
-	public Clasz getValueObject(String aFieldName, long aIndex) throws Exception {
-		FieldObjectBox oneField = (FieldObjectBox) this.getField(aFieldName);
-		Clasz result = oneField.getObject(aIndex);
+	public Clasz<?> getValueObject(String aFieldName, long aIndex) throws Exception {
+		FieldObjectBox<?> oneField = (FieldObjectBox<?>) this.getField(aFieldName);
+		Clasz<?> result = oneField.getObject(aIndex);
 		if (result == null) {
 			throw new Hinderance("In array objects: "+ aFieldName.toUpperCase() + ", there is no object at index: " + aIndex);
 		}
-		return(result);
+		return result;
 	}
 
 	public DateTime getValueDateTime(String aFieldName) throws Exception {
@@ -293,34 +313,29 @@ public class Record extends Base {
 		oneField.setValueDate(aValue);
 	}
 
-	public void setValueObject(String aFieldName, Clasz aValue) throws Exception {
-		FieldObject oneField = (FieldObject) this.getField(aFieldName);
+	/*
+	@SuppressWarnings("unchecked")
+	public void setValueObject(String aFieldName, Clasz<?> aValue) throws Exception {
+		FieldObject oneField = (FieldObject<?>) this.getField(aFieldName);
 		oneField.setValueObject(aValue);
 	}
 
-	@Deprecated
-	public void addValueObject(String aFieldName, Clasz aValue) throws Exception {
-		FieldObjectBox fieldBox = (FieldObjectBox) this.getField(aFieldName);
-		if (fieldBox.getMetaObj().getClaszName().equals("Clasz")) {
-			fieldBox.setMetaObj(aValue); // we just use this data record as meta record, hopefull it'll not introduce any bug	
-		}
-		fieldBox.addValueObject(aValue);
-	}
-
-	public void addValueObject(Connection aConn, String aFieldName, Clasz aValue) throws Exception {
-		FieldObjectBox fieldBox = (FieldObjectBox) this.getField(aFieldName);
-		if (fieldBox.getMetaObj().getClaszName().equals("Clasz")) {
+	@SuppressWarnings("unchecked")
+	public void addValueObject(Connection aConn, String aFieldName, Clasz<?> aValue) throws Exception {
+		FieldObjectBox fob2AddObj = (FieldObjectBox) this.getField(aFieldName);
+		if (fob2AddObj.getMetaObj().getClaszName().equals("Clasz")) {
 			Clasz metaObj = ObjectBase.CreateObject(aConn, aValue.getClass());
-			fieldBox.setMetaObj(metaObj);
+			fob2AddObj.setMetaObj(metaObj);
 		}
-		fieldBox.addValueObject(aValue);
+		fob2AddObj.addValueObject(aValue);
 	}
+	*/
 
 	public String getPkFieldName() {
 		String result = "";
 		for (Field eachField : this.getFieldBox().values()) {
 			if (eachField.isPrimaryKey()) {
-				result = eachField.getFieldName();
+				result = eachField.getDbFieldName();
 				break;
 			}
 		}
@@ -331,20 +346,20 @@ public class Record extends Base {
 		return(this.getFieldBox().size());
 	}
 
-	public void cloneField(Field aSourceField) throws Exception {
-		Field destField = this.getField(aSourceField.getFieldName());
+	public void cloneField(Connection aConn, Field aSourceField) throws Exception {
+		Field destField = this.getField(aSourceField.getDbFieldName());
 		if (destField == null) {
-			this.createField(aSourceField);
+			destField = this.createField(aConn, aSourceField);
 		}
-		destField.cloneField(aSourceField);
+		destField.cloneField(aConn, aSourceField);
 	}
 
-	public void copyValue(Field aSourceField) throws Exception {
-		Field destField = this.getField(aSourceField.getFieldName());
+	public void copyValue(Connection aConn, Field aSourceField) throws Exception {
+		Field destField = this.getField(aSourceField.getDbFieldName());
 		if (destField == null) {
-			this.createField(aSourceField);
+			destField = this.createField(aConn, aSourceField);
 		}
-		destField.copyValue(aSourceField);
+		destField.copyValue(aConn, aSourceField);
 	}
 
 	public void clear() {
@@ -354,7 +369,7 @@ public class Record extends Base {
 	public String toStr() throws Exception {
 		String result = "";
 		for (Field eachField : this.getFieldBox().values()) {
-			result += "[" + eachField.getFieldName() + ":" + eachField.getValueStr() + "]";
+			result += "[" + eachField.getDbFieldName() + ":" + eachField.getValueStr() + "]";
 		}
 		return(result);
 	}
@@ -375,24 +390,24 @@ public class Record extends Base {
 		}
 	}
 
-	public void copy(Record aCopyFrom) throws Exception {
+	public void copy(Connection aConn, Record aCopyFrom) throws Exception {
 		for (Field targetField : this.getFieldBox().values()) {
-			Field sourceField = aCopyFrom.getField(targetField.getFieldName());
+			Field sourceField = aCopyFrom.getField(targetField.getDbFieldName());
 			if (sourceField != null) {
-				targetField.copyValue(sourceField);
+				targetField.copyValue(aConn, sourceField);
 			} else {
-				throw new Hinderance("Source record do not have the field: " + targetField.getFieldName() + " to copy from!");
+				throw new Hinderance("Source record do not have the field: " + targetField.getDbFieldName() + " to copy from!");
 			}
 		}
 	}
 
-	public void copyStrNull(Record aCopyFrom) throws Exception { // check if copy method can copy null string and not blank string
+	public void copyStrNull(Connection aConn, Record aCopyFrom) throws Exception { // check if copy method can copy null string and not blank string
 		for (Field targetField : this.getFieldBox().values()) {
-			Field sourceField = aCopyFrom.getField(targetField.getFieldName());
+			Field sourceField = aCopyFrom.getField(targetField.getDbFieldName());
 			if (sourceField != null) {
-				targetField.copyValueStrNull(sourceField);
+				targetField.copyValueStrNull(aConn, sourceField);
 			} else {
-				throw new Hinderance("Source record do not have the field: " + targetField.getFieldName() + " to copy from!");
+				throw new Hinderance("Source record do not have the field: " + targetField.getDbFieldName() + " to copy from!");
 			}
 		}
 	}
@@ -407,4 +422,11 @@ public class Record extends Base {
 		FieldFloat oneField = (FieldFloat) this.getField(aFieldName);
 		oneField.setValueFloat(aValue);
 	}
+
+	public Field createField(String aName, Record aValue) throws Exception {
+		FieldRecord result = (FieldRecord) this.createField(aName, FieldType.RECORD);
+		result.setValueRecord(aValue);
+		return(result);
+	}
+
 }
